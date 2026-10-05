@@ -34,3 +34,18 @@ Until the project owner approves a technology stack and richer semantic UI, safe
 - Cross-file updates are allowed only when required to preserve an explicit reference/invariant affected by the user's action, and the editor should make the affected file set visible before or as part of the operation.
 - Corpus-wide search/replace and broad refactoring are not core editor responsibilities. External text tools may be used for those workflows.
 - Any global migration capability added in the future SHALL be an explicit, separately invoked operation with a previewable change set, never an implicit side effect of ordinary editing.
+
+
+## Continuous validation and constrained authoring invariant
+
+- Every meaningful YAML edit SHALL be parsed and validated promptly against the active SCAP-NG schema/version.
+- The implementation MAY use an in-memory JSON representation or a disposable temporary JSON file as the validation form; no temporary validation artifact is authoritative source and it SHALL NOT be committed.
+- Validation feedback SHALL be associated with the originating YAML document and, where possible, the exact field/location.
+- Validation SHALL distinguish YAML syntax/parsing errors from JSON Schema/schema errors and from higher-level semantic/reference errors.
+- Validation failures SHALL NOT destroy or rewrite the user's YAML. Invalid content remains editable until corrected.
+- Finite schema vocabularies SHALL be presented through constrained controls such as dropdowns/radio/selectors rather than unrestricted free text wherever practical.
+- Boolean, numeric, enum, required/optional, pattern, and reference constraints SHOULD be enforced or guided in the authoring UI before save when doing so does not hide valid schema capability.
+- Reference fields SHOULD offer valid target IDs/paths discovered from the loaded project rather than requiring authors to type identifiers from memory.
+- Structured controls SHALL be derived from the active schema/reference model where practical rather than duplicating enum values in editor source code.
+- The editor SHALL retain a raw YAML editing path so authors can access the complete source representation and so forward-compatible/unknown content is not blocked by an incomplete structured UI.
+- Raw-YAML and structured editing SHALL operate on the same document model and SHALL NOT silently discard fields unknown to the structured UI.
