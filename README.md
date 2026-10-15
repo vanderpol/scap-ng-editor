@@ -4,7 +4,7 @@ A small, open-source editor for authoring and reviewing SCAP-NG content.
 
 ## Shared development handoff
 
-**[Current development plan for both Codex and ChatGPT](docs/SHARED-DEVELOPMENT-PLAN.md)** — one up-to-date place for milestones, next implementation task, evidence, blockers, and open decisions. Both tools should use the root [`AGENTS.md`](AGENTS.md) instructions and update this plan through normal GitHub commits rather than exchanging long prompts.
+**[Current development plan for both Codex and ChatGPT](docs/SHARED-DEVELOPMENT-PLAN.md)** — one up-to-date place for milestones, next implementation task, evidence, blockers, and open decisions. Both tools should use the root [`AGENTS.md`](AGENTS.md) instructions and update this plan through normal GitHub commits rather than exchanging long prompts. **Every new commit must cite the relevant GitHub issue** (for example, `Refs #2`); the repository checks issue-ID syntax on pushes to `main`.
 
 ## Current architecture proposal
 

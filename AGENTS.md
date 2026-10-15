@@ -6,6 +6,16 @@ The **single living development plan** is [`docs/SHARED-DEVELOPMENT-PLAN.md`](do
 
 Contributors should work from current `main`, keep commits issue-linked, use external pinned SCAP-NG schemas and external sample data, and reconcile concurrent edits rather than overwriting another contributor's update. The plan cannot start Codex or other agents automatically.
 
+## Required GitHub issue correlation for EVERY commit
+
+**Every new commit to this repository MUST include an actual GitHub issue number in its commit message**, including code, tests, documentation, CI, infrastructure, refactoring and agent-generated commits. Use `Refs #2`, `Fixes #2`, or `Closes #2` (or the relevant narrower issue); a commit can cite multiple issue IDs. Prefer `Refs #N` for ongoing work and reserve `Fixes/Closes #N` for a completed issue. Do **not** cite an unrelated placeholder issue just to satisfy the check.
+
+- **Before work:** confirm an existing issue describes the task; if none does, open a meaningful issue. Use its ID in every commit addressing that task.
+- **During work:** ensure each atomic commit includes a relevant `#N` in the commit message, not just the PR body or the development plan.
+- **After work:** update the issue with implementation status, commit reference, focused tests/CI links and open limitations; update the shared development plan at milestone transitions. The issue is the detailed audit trail; the plan is the concise cross-agent handoff.
+- **Automation:** `.github/workflows/check-commit-issue-links.yml` checks issue-number syntax on each new push to `main`. It does **not** establish that the cited issue exists, is relevant, or that tests passed. Contributors and reviewers retain that responsibility.
+- Existing historical commits need not be rewritten. Never force-push or rewrite history just to add issue IDs.
+
 ## Repository boundary
 
 - Keep this repository intentionally small and transferable.

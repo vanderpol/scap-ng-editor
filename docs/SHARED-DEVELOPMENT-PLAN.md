@@ -1,7 +1,7 @@
 # Shared Development Plan — SCAP-NG Assessment Editor
 
 **Updated:** 2026-10-15  
-**Status:** planning and foundation work only; **no editor application has been implemented or validated yet**.  
+**Status:** planning and foundation work only; **no editor application has been implemented or validated yet**. New commits must cite real GitHub issues.  
 **Repository:** `vanderpol/scap-ng-editor` (`main`)  
 **Primary work item:** [Assessment-first MVP #2](https://github.com/vanderpol/scap-ng-editor/issues/2)  
 **Future product decision:** [Full workbench vs. editor entrypoint #1](https://github.com/vanderpol/scap-ng-editor/issues/1)
@@ -25,11 +25,15 @@ Build an **Assessment-only SCAP-NG editor** that creates, opens, safely edits, a
 ## How collaborators coordinate
 
 1. **At start of a session:** read `AGENTS.md`, this plan, [MVP requirements](ASSESSMENT-FIRST-MVP.md), [architecture](ARCHITECTURE.md), and current GitHub issues. Check `main` and recent commits to avoid duplicating work; fetch current versions before edits.
-2. **Take one well-bounded task:** link the issue in every meaningful commit (`Refs #2`, or a narrower issue when created). Work on `main` under the repository's trunk-based preference; no untracked branches or hidden copies of source content.
+2. **Take one well-bounded task:** **every new commit** must cite its relevant GitHub issue (for example, `Refs #2`), including docs, CI, tests and infrastructure. Confirm the issue exists and describes the work before the first commit. Work on `main` under the repository's trunk-based preference; no untracked branches or hidden copies of source content.
 3. **Implement and test:** small focused changes, safe no-op edit cases, negative fixtures and precise diagnostics. A test passing does not ratify language semantics, prove OVAL runtime equivalence, or establish scanner conformance.
 4. **Update the handoff in the same commit:** move the completed item to **Evidence/Completed**, include specific files/commit/tests and known limitations, and select the next actionable step. If blocked on an owner decision, stop at the decision boundary and record the concrete question.
 5. **Avoid concurrent handoff collisions:** only one contributor should update this plan at a time. If another contributor changed it, refetch, reconcile and commit without overwriting their work. Source-code work can proceed in parallel on distinct files with explicit ownership through issues.
 6. **Never infer that Codex or ChatGPT has started automatically.** An authorized session reads the repository and proceeds when explicitly invoked. If a workflow is not connected, handoff via the issue and this file; do not promise background execution.
+
+## GitHub issue ↔ commit audit trail
+
+All commits MUST contain a relevant `#<issue number>`, for example `Refs #2`, `Fixes #2` or `Closes #2`. Use `Refs` while the issue remains open; close issues only when their acceptance gates are complete. CI checks commit-message formatting for new pushes to `main`; humans/agents must also verify the issue exists and genuinely describes the change. Keep detailed technical decisions and testing evidence on issues, with a link and short checkpoint in this plan. Avoid meaningless issue-per-commit tickets: split issues by coherent workstream, not by every file.
 
 ## Current milestone: safe editor foundations
 
@@ -37,7 +41,7 @@ Build an **Assessment-only SCAP-NG editor** that creates, opens, safely edits, a
 
 | Step | Status | Deliverable and acceptance gate |
 | --- | --- | --- |
-| 0. Shared project handoff | **Done — documentation only** | This plan, link from `AGENTS.md`/README, and issues #1/#2 |
+| 0. Shared project handoff | **Done — documentation only** | This plan, link from `AGENTS.md`/README, issues #1/#2, and new-commit issue-ID check |
 | 1. Confirm UI host and library boundaries | **Decision pending** | Owner approves whether to start as VS Code extension; no finalized UI shell assumed |
 | 2. Source-safe YAML/JSON document services | **Not started** | Preserve untouched source, comments/unknown keys where supported; no-op open/save is byte-for-byte; explicit, localized edits only |
 | 3. External versioned schemas and diagnostics | **Not started** | Pin selected `scap-ng` schema; classify syntax vs schema vs semantic/reference diagnostics with source location; invalid documents stay editable |
@@ -60,7 +64,7 @@ Use **fixtures from the external sample-data repository**, not copied snapshots 
 
 ## Evidence / completed
 
-- 2026-10-15: Research/design scope and Assessment-first plan documented. No application implementation, executed editor tests, or selected UI stack claimed. [Issue #2](https://github.com/vanderpol/scap-ng-editor/issues/2).
+- 2026-10-15: Research/design scope and Assessment-first plan documented. All new commits require a relevant GitHub issue ID; added a syntax-only CI gate. No editor application implementation or editor test results claimed. [Issue #2](https://github.com/vanderpol/scap-ng-editor/issues/2).
 
 ## Open owner decisions
 
