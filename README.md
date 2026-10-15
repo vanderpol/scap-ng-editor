@@ -2,6 +2,10 @@
 
 A small, open-source editor for authoring and reviewing SCAP-NG content.
 
+## Current architecture proposal
+
+[VS Code-first assistive editing vs standalone graphical workbench](docs/EDITOR-IMPLEMENTATION-RECOMMENDATION.md) — an exploratory tradeoff analysis, **not yet an approved stack**. The three authoring modes and complete native source/graph handling requirements remain intact.
+
 ## Project boundary
 
 This repository contains the editor application and editor-specific tests only.
