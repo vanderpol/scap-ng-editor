@@ -37,7 +37,7 @@ All commits MUST contain a relevant `#<issue number>`, for example `Refs #2`, `F
 
 ## External 0.4 schema linkage
 
-The exact schema source, research overlay boundary, pinned-version loader contract, and current implementation status are documented in [SCHEMA-INPUT-CONTRACT.md](SCHEMA-INPUT-CONTRACT.md). **No editor code is linked to the draft schema yet.** The source is `vanderpol/scap-ng/schema/v0.4.0/`; the Joval scoped grammar remains an explicitly separate research overlay. The 0.4 semantic gate [#229](https://github.com/vanderpol/scap-ng/issues/229) and Rule-reference closure [#230](https://github.com/vanderpol/scap-ng/issues/230) precede Codex implementation.
+The exact schema source, research overlay boundary, pinned-version loader contract, and current implementation status are documented in [SCHEMA-INPUT-CONTRACT.md](SCHEMA-INPUT-CONTRACT.md). **No editor code is linked to the draft schema yet.** The source is `vanderpol/scap-ng/schema/v0.4.0/`; the Joval scoped grammar remains an explicitly separate research overlay. The six-STIG Rule choice closure defect was fixed in [release r3](https://github.com/vanderpol/scap-ng/releases/tag/v0.4.0-joval-meeting-preview-20261015-r3) (2,958/2,958 references resolved, [#230](https://github.com/vanderpol/scap-ng/issues/230) complete). The 0.4 semantic gate [#229](https://github.com/vanderpol/scap-ng/issues/229) and Rule-reference closure [#230](https://github.com/vanderpol/scap-ng/issues/230) precede Codex implementation.
 
 ## Current dependency: deeper SCAP-NG 0.4 tests before Codex implementation
 
@@ -91,6 +91,6 @@ Use **fixtures from the external sample-data repository**, not copied snapshots 
 - [Architecture and three long-term modes](ARCHITECTURE.md)
 - [UI implementation tradeoffs](EDITOR-IMPLEMENTATION-RECOMMENDATION.md)
 - [External test corpus](https://github.com/vanderpol/scap-ng-editor-sample-data)
-- [SCAP-NG 0.4 design / six-STIG preview](https://github.com/vanderpol/scap-ng/releases/tag/v0.4.0-joval-meeting-preview-20261015-r2)
+- [SCAP-NG 0.4 design / six-STIG preview](https://github.com/vanderpol/scap-ng/releases/tag/v0.4.0-joval-meeting-preview-20261015-r3)
 
 **Durability rule:** keep this concise enough to be read at the start of each coding session; detailed acceptance criteria and work discussion belong in GitHub issues and tests. Never mark an item complete without an implementation link and evidence.
