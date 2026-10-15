@@ -14,6 +14,10 @@ A small, open-source editor for authoring and reviewing SCAP-NG content.
 
 We are starting from an **[Assessment-only editor](docs/ASSESSMENT-FIRST-MVP.md)** (tracked in [issue #2](https://github.com/vanderpol/scap-ng-editor/issues/2)) before building the entire Benchmark and Rule workbench. It should generate draft native Assessments from vetted patterns or converted OVAL, provide guided editing, completion and versioned validation, and safely preserve complex source. The [broader application plan](docs/EDITOR-IMPLEMENTATION-RECOMMENDATION.md) remains, sharing the same editing core. This is a design priority; the frontend stack is still undecided.
 
+## SCAP-NG 0.4 schema linkage
+
+[External draft-schema integration contract](docs/SCHEMA-INPUT-CONTRACT.md): exact SCAP-NG schema paths, candidate overlay, reproducible version-pinning rules, and validation boundaries. **Documented, not implemented; Codex editor coding is held pending SCAP-NG conformance gate #229.**
+
 ## Project boundary
 
 This repository contains the editor application and editor-specific tests only.

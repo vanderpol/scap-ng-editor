@@ -23,6 +23,10 @@ Contributors should work from current `main`, keep commits issue-linked, use ext
 - Any SCAP-NG content used as editor sample/test input SHALL live in `vanderpol/scap-ng-editor-sample-data`.
 - Do not create a second maintained copy of SCAP-NG schemas here. Load schemas as external versioned inputs.
 
+## Schema authority and current Codex gate
+
+Read [`docs/SCHEMA-INPUT-CONTRACT.md`](docs/SCHEMA-INPUT-CONTRACT.md) before any schema work. The `schema/v0.4.0` base draft belongs to `vanderpol/scap-ng`; the Joval scoped candidate is a separate research overlay. No editor integration is implemented. **Do not start Codex editor implementation work until the owner releases the SCAP-NG 0.4 semantic gate** tracked at `vanderpol/scap-ng#229`; preserve the freedom to research and test schemas without silently promoting candidate vocabulary.
+
 ## Schema and content handling
 
 - Prefer schema-driven behavior over duplicated vocabulary in application code.

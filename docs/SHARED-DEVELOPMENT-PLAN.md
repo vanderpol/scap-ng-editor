@@ -35,6 +35,10 @@ Build an **Assessment-only SCAP-NG editor** that creates, opens, safely edits, a
 
 All commits MUST contain a relevant `#<issue number>`, for example `Refs #2`, `Fixes #2` or `Closes #2`. Use `Refs` while the issue remains open; close issues only when their acceptance gates are complete. CI checks commit-message formatting for new pushes to `main`; humans/agents must also verify the issue exists and genuinely describes the change. Keep detailed technical decisions and testing evidence on issues, with a link and short checkpoint in this plan. Avoid meaningless issue-per-commit tickets: split issues by coherent workstream, not by every file.
 
+## External 0.4 schema linkage
+
+The exact schema source, research overlay boundary, pinned-version loader contract, and current implementation status are documented in [SCHEMA-INPUT-CONTRACT.md](SCHEMA-INPUT-CONTRACT.md). **No editor code is linked to the draft schema yet.** The source is `vanderpol/scap-ng/schema/v0.4.0/`; the Joval scoped grammar remains an explicitly separate research overlay. The 0.4 semantic gate [#229](https://github.com/vanderpol/scap-ng/issues/229) and Rule-reference closure [#230](https://github.com/vanderpol/scap-ng/issues/230) precede Codex implementation.
+
 ## Current dependency: deeper SCAP-NG 0.4 tests before Codex implementation
 
 **Owner decision, 2026-10-15:** **Do not assign Codex editor coding work yet.** Run a more intensive 0.4 specification/conversion/semantic audit first. The primary evidence-and-gates issue is [SCAP-NG #229](https://github.com/vanderpol/scap-ng/issues/229), related to [schema gate #228](https://github.com/vanderpol/scap-ng/issues/228), [vocabulary #227](https://github.com/vanderpol/scap-ng/issues/227), and [current converter regression #226](https://github.com/vanderpol/scap-ng/issues/226).
