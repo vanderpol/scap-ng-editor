@@ -2,6 +2,10 @@
 
 A small, open-source editor for authoring and reviewing SCAP-NG content.
 
+## Shared development handoff
+
+**[Current development plan for both Codex and ChatGPT](docs/SHARED-DEVELOPMENT-PLAN.md)** — one up-to-date place for milestones, next implementation task, evidence, blockers, and open decisions. Both tools should use the root [`AGENTS.md`](AGENTS.md) instructions and update this plan through normal GitHub commits rather than exchanging long prompts.
+
 ## Current architecture proposal
 
 [VS Code-first assistive editing vs standalone graphical workbench](docs/EDITOR-IMPLEMENTATION-RECOMMENDATION.md) — an exploratory tradeoff analysis, **not yet an approved stack**. The three authoring modes and complete native source/graph handling requirements remain intact.

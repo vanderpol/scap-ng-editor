@@ -1,0 +1,79 @@
+# Shared Development Plan — SCAP-NG Assessment Editor
+
+**Updated:** 2026-10-15  
+**Status:** planning and foundation work only; **no editor application has been implemented or validated yet**.  
+**Repository:** `vanderpol/scap-ng-editor` (`main`)  
+**Primary work item:** [Assessment-first MVP #2](https://github.com/vanderpol/scap-ng-editor/issues/2)  
+**Future product decision:** [Full workbench vs. editor entrypoint #1](https://github.com/vanderpol/scap-ng-editor/issues/1)
+
+> **The shared contract for ChatGPT, Codex, and human contributors.** Read this file and root `AGENTS.md` before beginning development. Commit updates to this file alongside meaningful implementation milestones. The **repository** is the communication medium; chat prompts are not the durable project specification. This file is not an autonomous job queue or a signal that a task is running.
+
+## One-sentence product goal
+
+Build an **Assessment-only SCAP-NG editor** that creates, opens, safely edits, and validates complete automated, manual, and applicability Assessments, with guided editing and a synchronized native YAML/JSON view. It must later plug into a Benchmark → Rule → Assessment authoring workbench without a second editing engine.
+
+### Decisions already made
+
+- **Assessment-first** is the initial product scope; Benchmark metadata, Rule authoring, Profiles, and complete STIG management come later.
+- Source YAML/JSON is authoritative. Saving must preserve comments/unknown fields and avoid rewriting unrelated files.
+- Schemas and capability data are loaded from pinned external `vanderpol/scap-ng` sources; do not keep a second maintained copy here. Real content test fixtures live in `vanderpol/scap-ng-editor-sample-data`.
+- The engine must support the **full native authoring model** eventually, including nested Variables, Sets, Filters, `for_each`, conditionals, records, shared Assessments, and cross-file references. Text-only preservation of unsupported constructs is **not** full structured support.
+- Favor assisted source editing with schema-aware completions and contextual structured forms. Do not require a giant drag-and-drop flowchart.
+- **0.4 vocabulary and semantics are not ratified.** Keep source syntax/version adapters separate from display concepts. A spelling rename is not permission to change cardinality, missing/error/unknown outcomes, or collection semantics.
+- **UI shell remains undecided.** A VS Code extension is recommended as the first low-cost implementation candidate; a standalone GUI is an option built on the same engine, not a separate project or duplicate validator. Do not treat the recommendation as an approved permanent stack.
+
+## How collaborators coordinate
+
+1. **At start of a session:** read `AGENTS.md`, this plan, [MVP requirements](ASSESSMENT-FIRST-MVP.md), [architecture](ARCHITECTURE.md), and current GitHub issues. Check `main` and recent commits to avoid duplicating work; fetch current versions before edits.
+2. **Take one well-bounded task:** link the issue in every meaningful commit (`Refs #2`, or a narrower issue when created). Work on `main` under the repository's trunk-based preference; no untracked branches or hidden copies of source content.
+3. **Implement and test:** small focused changes, safe no-op edit cases, negative fixtures and precise diagnostics. A test passing does not ratify language semantics, prove OVAL runtime equivalence, or establish scanner conformance.
+4. **Update the handoff in the same commit:** move the completed item to **Evidence/Completed**, include specific files/commit/tests and known limitations, and select the next actionable step. If blocked on an owner decision, stop at the decision boundary and record the concrete question.
+5. **Avoid concurrent handoff collisions:** only one contributor should update this plan at a time. If another contributor changed it, refetch, reconcile and commit without overwriting their work. Source-code work can proceed in parallel on distinct files with explicit ownership through issues.
+6. **Never infer that Codex or ChatGPT has started automatically.** An authorized session reads the repository and proceeds when explicitly invoked. If a workflow is not connected, handoff via the issue and this file; do not promise background execution.
+
+## Current milestone: safe editor foundations
+
+**Goal:** a version-agnostic foundation that can load, edit, save and diagnose real native Assessments without losing data. The emphasis is proving correct round trips and establishing integration points before building graphical behavior.
+
+| Step | Status | Deliverable and acceptance gate |
+| --- | --- | --- |
+| 0. Shared project handoff | **Done — documentation only** | This plan, link from `AGENTS.md`/README, and issues #1/#2 |
+| 1. Confirm UI host and library boundaries | **Decision pending** | Owner approves whether to start as VS Code extension; no finalized UI shell assumed |
+| 2. Source-safe YAML/JSON document services | **Not started** | Preserve untouched source, comments/unknown keys where supported; no-op open/save is byte-for-byte; explicit, localized edits only |
+| 3. External versioned schemas and diagnostics | **Not started** | Pin selected `scap-ng` schema; classify syntax vs schema vs semantic/reference diagnostics with source location; invalid documents stay editable |
+| 4. Project reference and dependency index | **Not started** | Navigate identities/references, report missing targets/cycles; handle reusable/shared Assessments and nested graphs |
+| 5. Assisted editor and generation UI | **Not started** | Property tree and expert YAML/JSON operate on one source; valid completions; one vetted pattern generates an editable draft, no guessed semantic defaults |
+| 6. Integration and corpus validation | **Not started** | Easy and hard real-source fixtures pass round-trip and negative tests; report scope/coverage, not unsupported scanner results |
+
+### Next safe executable engineering task (independent of UI shell)
+
+**Implement or prototype the source-preserving document abstraction with focused tests.** Define its API contract before selecting the UI wrapper: `open`, `read`, `applySurgicalEdit`, `save`, and `getDiagnostics` (these are illustrative interface responsibilities, not mandated source code identifiers). Prove:
+- a no-op open/save leaves existing YAML bytes unchanged;
+- edits do not rewrite siblings, rename unrelated IDs, or drop comments/unknown fields;
+- invalid YAML stays editable and retains precise parse diagnostics;
+- JSON and YAML round-trip *without silently normalizing or changing meaning*;
+- the active schema version is attached without hard-coded 0.4 names.
+
+Use **fixtures from the external sample-data repository**, not copied snapshots of the SCAP-NG corpus committed here. Narrow the tests first, then widen to production examples. Do not begin an opinionated capability form before semantics and snapshot mapping are approved.
+
+**First demonstration corpus:** RHEL9 `SV-257851`; Windows11 `SV-253254` and `SV-253495`; RHEL9 `SV-257889`; one deep Variable/Filter/shared-Assessment example. Keep the pinned 0.4 Joval research candidate clearly labeled non-normative.
+
+## Evidence / completed
+
+- 2026-10-15: Research/design scope and Assessment-first plan documented. No application implementation, executed editor tests, or selected UI stack claimed. [Issue #2](https://github.com/vanderpol/scap-ng-editor/issues/2).
+
+## Open owner decisions
+
+- **UI host for first runnable client:** proceed with VS Code extension as recommended, or use a small standalone shell? This choice should not change source/model contracts.
+- **Vocabulary and semantic promotion:** approved 0.4 schema will govern generation and validators; until then load explicitly pinned snapshots and present candidate-only labels.
+- **Authoring generation:** vetted deterministic patterns first; optional AI and prose-to-Assessment inference later, with marked unanswered author questions and no automatic publication.
+
+## Related materials
+
+- [Assessment-first MVP](ASSESSMENT-FIRST-MVP.md)
+- [Architecture and three long-term modes](ARCHITECTURE.md)
+- [UI implementation tradeoffs](EDITOR-IMPLEMENTATION-RECOMMENDATION.md)
+- [External test corpus](https://github.com/vanderpol/scap-ng-editor-sample-data)
+- [SCAP-NG 0.4 design / six-STIG preview](https://github.com/vanderpol/scap-ng/releases/tag/v0.4.0-joval-meeting-preview-20261015-r2)
+
+**Durability rule:** keep this concise enough to be read at the start of each coding session; detailed acceptance criteria and work discussion belong in GitHub issues and tests. Never mark an item complete without an implementation link and evidence.

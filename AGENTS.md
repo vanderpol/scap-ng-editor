@@ -1,5 +1,11 @@
 # SCAP-NG Editor development invariants
 
+## Shared ChatGPT / Codex handoff
+
+The **single living development plan** is [`docs/SHARED-DEVELOPMENT-PLAN.md`](docs/SHARED-DEVELOPMENT-PLAN.md). **Read it before implementing** and update its current milestone, test evidence and next task alongside meaningful work. GitHub issues hold detailed tasks and decisions; `AGENTS.md` holds enduring rules. Neither a prior chat nor an agent's unpublished scratchpad is an authoritative development plan.
+
+Contributors should work from current `main`, keep commits issue-linked, use external pinned SCAP-NG schemas and external sample data, and reconcile concurrent edits rather than overwriting another contributor's update. The plan cannot start Codex or other agents automatically.
+
 ## Repository boundary
 
 - Keep this repository intentionally small and transferable.
