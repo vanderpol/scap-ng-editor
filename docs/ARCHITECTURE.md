@@ -4,6 +4,10 @@
 
 The editor is intended to consume and edit all SCAP-NG authoring content, including the most complex real-world content. The design SHALL be exercised against the large corpus in `vanderpol/scap-ng-editor-sample-data`, not only simplified examples.
 
+## Implementation order — start with Assessments-only
+
+[Assessment-first MVP](ASSESSMENT-FIRST-MVP.md) is the agreed starting **design scope**: create/edit/generate complete native Assessments without requiring a Benchmark or Rule. It is first because Assessment authoring and semantic validation are the hardest reusable components. The full Benchmark→Rule→Assessment workbench will reuse the same source model and Assessment UI; it is a separate later application/view, not a separate editor engine. No UI stack is selected by this ordering.
+
 ## Three first-class authoring modes
 
 ### 1. STIG manual

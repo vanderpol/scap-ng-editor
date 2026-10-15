@@ -6,6 +6,10 @@ A small, open-source editor for authoring and reviewing SCAP-NG content.
 
 [VS Code-first assistive editing vs standalone graphical workbench](docs/EDITOR-IMPLEMENTATION-RECOMMENDATION.md) — an exploratory tradeoff analysis, **not yet an approved stack**. The three authoring modes and complete native source/graph handling requirements remain intact.
 
+## First milestone: Assessment authoring
+
+We are starting from an **[Assessment-only editor](docs/ASSESSMENT-FIRST-MVP.md)** (tracked in [issue #2](https://github.com/vanderpol/scap-ng-editor/issues/2)) before building the entire Benchmark and Rule workbench. It should generate draft native Assessments from vetted patterns or converted OVAL, provide guided editing, completion and versioned validation, and safely preserve complex source. The [broader application plan](docs/EDITOR-IMPLEMENTATION-RECOMMENDATION.md) remains, sharing the same editing core. This is a design priority; the frontend stack is still undecided.
+
 ## Project boundary
 
 This repository contains the editor application and editor-specific tests only.
