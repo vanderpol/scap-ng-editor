@@ -35,6 +35,15 @@ Build an **Assessment-only SCAP-NG editor** that creates, opens, safely edits, a
 
 All commits MUST contain a relevant `#<issue number>`, for example `Refs #2`, `Fixes #2` or `Closes #2`. Use `Refs` while the issue remains open; close issues only when their acceptance gates are complete. CI checks commit-message formatting for new pushes to `main`; humans/agents must also verify the issue exists and genuinely describes the change. Keep detailed technical decisions and testing evidence on issues, with a link and short checkpoint in this plan. Avoid meaningless issue-per-commit tickets: split issues by coherent workstream, not by every file.
 
+## Current dependency: deeper SCAP-NG 0.4 tests before Codex implementation
+
+**Owner decision, 2026-10-15:** **Do not assign Codex editor coding work yet.** Run a more intensive 0.4 specification/conversion/semantic audit first. The primary evidence-and-gates issue is [SCAP-NG #229](https://github.com/vanderpol/scap-ng/issues/229), related to [schema gate #228](https://github.com/vanderpol/scap-ng/issues/228), [vocabulary #227](https://github.com/vanderpol/scap-ng/issues/227), and [current converter regression #226](https://github.com/vanderpol/scap-ng/issues/226).
+
+- **Already proven:** research candidate 0.4 six-STIG schema/source round-trip and mirrored YAML/JSON authoring values, not execution outcomes.
+- **Still to prove:** six-state outcomes across all nested scopes, valid negative and exceptional combinations, if/else vs OVAL Boolean non-equivalence boundaries, foreach/filters/dynamic Variables/records, independent JSON reference resolution/build, and current-main converter fidelity.
+- **Gate:** don't start vocabulary-specific forms or generated Assessment semantics until their versioned test/reference contract is reviewed and passed. Source-safe parser design, external schema loading, and interface research are semantically independent but should only be coded when separately authorized.
+- **Codex first prototype effort planning:** rough allowance of 1–2 weeks of iterative engineering for a basic assisted editor after this gate; not a guarantee or an ongoing background task.
+
 ## Current milestone: safe editor foundations
 
 **Goal:** a version-agnostic foundation that can load, edit, save and diagnose real native Assessments without losing data. The emphasis is proving correct round trips and establishing integration points before building graphical behavior.
@@ -42,7 +51,7 @@ All commits MUST contain a relevant `#<issue number>`, for example `Refs #2`, `F
 | Step | Status | Deliverable and acceptance gate |
 | --- | --- | --- |
 | 0. Shared project handoff | **Done — documentation only** | This plan, link from `AGENTS.md`/README, issues #1/#2, and new-commit issue-ID check |
-| 1. Confirm UI host and library boundaries | **Decision pending** | Owner approves whether to start as VS Code extension; no finalized UI shell assumed |
+| 1. Confirm UI host and library boundaries | **Decision pending; 0.4 testing first** | Owner approves whether to start as VS Code extension; no finalized UI shell assumed |
 | 2. Source-safe YAML/JSON document services | **Not started** | Preserve untouched source, comments/unknown keys where supported; no-op open/save is byte-for-byte; explicit, localized edits only |
 | 3. External versioned schemas and diagnostics | **Not started** | Pin selected `scap-ng` schema; classify syntax vs schema vs semantic/reference diagnostics with source location; invalid documents stay editable |
 | 4. Project reference and dependency index | **Not started** | Navigate identities/references, report missing targets/cycles; handle reusable/shared Assessments and nested graphs |
