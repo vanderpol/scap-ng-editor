@@ -2,7 +2,39 @@
 
 **October 15, 2026. Status: research recommendation for [issue #1](https://github.com/vanderpol/scap-ng-editor/issues/1), not approved implementation.**
 
-## Recommendation
+## User-directed refinement — benchmark-centric authoring workbench (October 15, 2026)
+
+The product should lead with **Benchmark → Rules → Assessment generation**, not with source-file editing. This is a stronger use case than the earlier VS Code-first assistive-editor hypothesis. The **preferred end-user experience** is now a **standalone/offline-ready, benchmark-centric graphical workbench with an expert YAML/JSON editor**, supported by one independent document/semantic engine. A VS Code extension remains a useful second client or an inexpensive early proof of the language engine, but should not determine the author's navigation and workflow. This is a design recommendation, **not a stack authorization or permission to begin implementation**.
+
+### Primary author workflow
+
+1. **Open, import, or create a Benchmark.** Edit metadata, Groups, Profiles, identifiers, references, version, applicability and authoring provenance in clear forms. Support large existing Benchmarks without expanding the whole corpus into one screen.
+2. **List, search, clone, or create Rules.** Edit policy prose, severity, check text, remediation, references, IDs, applicability, Assessment choices and default choice. Show state per Rule: no Assessment, manual available, automated draft, validated structurally, reviewed, ready for publication. Do not mistake schema-valid for scanner tested.
+3. **Build an Assessment draft from the Rule.** If existing SCAP 1.4 OVAL/XCCDF is present, use the existing source-preserving conversion pipeline and retain source IDs and coverage; if no OVAL exists, select known capability patterns from the check procedure and suggest selectors, comparisons, conditions, inputs and manual alternative. Preserve exact requirement identity. Reuse an identical already-reviewed Assessment rather than cloning it by default.
+4. **Resolve ambiguous semantics interactively.** Ask the author for observable property/capability, selector scope, expected values, existence and match cardinality, missing/error handling, and organizational-input provenance only where evidence cannot establish them. For Windows records, nested Filters, foreach and conditional patterns, offer a structured drill-down preserving independent scopes. Neither a pattern nor an AI assistant may silently choose a default.
+5. **Inspect and validate.** Show the generated Object/State/Test/evaluate tree, human-readable explanation and editable native YAML/JSON diff; distinguish parsed/schema/reference checks, source-equivalence proofs, simulated outcomes and actual scanner validation. Let authors add precise expected-result fixtures (including failure/absence/unknown). Compiler/output packaging is only enabled when versioned tooling exists.
+6. **Review/publish in Git.** Save only native SCAP-NG files, update linked IDs safely, show the exact touched files and revision history, and keep release approval separate from editor generation.
+
+### Generated-content trust levels
+
+- **Imported and losslessly converted:** original XML/Rule source tied to proven source-reconstruction rules; provenance and exceptions recorded. Source equivalence still does not prove scanner execution.
+- **Deterministically generated from a vetted recipe:** a structured pattern with explicit author-supplied selectors and expectations. Show all generated nodes and confirm validity; pattern-specific semantics must be tested.
+- **Suggested from prose or optionally an LLM:** hypotheses/drafts only; attach source passages and unresolved questions, mark unverified values, never auto-publish or mark compliant. AI must be optional for offline/controlled deployments and must not bypass the authoritative validator.
+- **Manually authored:** identical validation, provenance and review treatment; easy starting templates for unsupported automation.
+
+### Recommended graphical balance
+
+The **primary GUI** is a Benchmark navigator + searchable Rule grid + guided Rule/Assessment editor + diagnostics/source preview. Use forms, trees, select menus, test/evidence panels and small focused dependency diagrams. **Avoid a full-graph drag-and-drop canvas as the principal editor.** A complete recursive structured inspector must support every in-scope native form; text-only fallback is preservation, not proof of full structured coverage.
+
+### Architectural consequence
+
+Keep the existing three authoring modes (STIG manual, full SCAP-NG, Assessments-only) as different entry points over **one native project model**. The editor remains independent of the specification repository and external sample-data corpus. Build an interoperable core (model, schema/semantic adapter, safe AST edits, dependency resolver, reproducible generation recipes) and present it through a benchmark-centric UI. A standalone desktop shell is now preferable for broad non-programmer author adoption; a VS Code extension can reuse the same services for experts. Choose packaging after a benchmark-to-generated-assessment prototype with both novice and expert authors, not before. No second assessment dialect and no hidden editor database of normative content.
+
+**First meaningful acceptance demonstration:** import a representative real Benchmark, modify metadata, add a Rule with check/fix, generate one verified automated Assessment from existing OVAL, generate one explicitly provisional Assessment from prose with unanswered questions, and preserve complex linked Windows/Unix Assessment graphs through save and reopen. Existing validity/round-trip tests remain a prerequisite, not the demonstration itself.
+
+---
+
+## Earlier entrypoint recommendation (superseded as preferred UX by the benchmark-centric refinement)
 
 **Start with an assistive VS Code extension built on a complete, editor-independent SCAP-NG document/reference/validation engine.** Implement a full *structured* editor over the same model as capability coverage matures. Add targeted graphical panels; **do not start with a canvas-first or forms-only standalone product**. Consider packaging a standalone offline tool later using Eclipse Theia (or a selected shell) if author testing demonstrates a need.
 
