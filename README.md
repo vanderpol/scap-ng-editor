@@ -6,6 +6,12 @@ A small, open-source editor for authoring and reviewing SCAP-NG content.
 
 **[Current development plan for both Codex and ChatGPT](docs/SHARED-DEVELOPMENT-PLAN.md)** — one up-to-date place for milestones, next implementation task, evidence, blockers, and open decisions. Both tools should use the root [`AGENTS.md`](AGENTS.md) instructions and update this plan through normal GitHub commits rather than exchanging long prompts. **Every new commit must cite the relevant GitHub issue** (for example, `Refs #2`); the repository checks issue-ID syntax on pushes to `main`.
 
+## October 16 Joval → Codex handoff
+
+The [first Codex engineering slice is specified in issue #3](https://github.com/vanderpol/scap-ng-editor/issues/3): **source-preserving Assessment document edits + pinned schema diagnostics**. Its owner-set implementation gate is **still closed** while [SCAP-NG 0.4 semantic review #229](https://github.com/vanderpol/scap-ng/issues/229) is open. Neither the issue nor the handoff starts an agent. Real pinned test files are [tracked separately in sample-data #1](https://github.com/vanderpol/scap-ng-editor-sample-data/issues/1); synthetic parsing fixtures are available but are not equivalent to a real-source test corpus.
+
+The Joval technical meeting uses this [one-page October 16 agenda](https://github.com/vanderpol/scap-ng/blob/main/research/assessment-simplification/compact-authoring-04/JOVAL-MEETING-2026-10-16.md). No 0.4 research candidate was promoted to a normative schema merely by passing source validation.
+
 ## Current architecture proposal
 
 [VS Code-first assistive editing vs standalone graphical workbench](docs/EDITOR-IMPLEMENTATION-RECOMMENDATION.md) — an exploratory tradeoff analysis, **not yet an approved stack**. The three authoring modes and complete native source/graph handling requirements remain intact.
