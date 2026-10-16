@@ -5,7 +5,7 @@
 **Repository:** `vanderpol/scap-ng-editor` (`main`)  
 **Primary work item:** [Assessment-first MVP #2](https://github.com/vanderpol/scap-ng-editor/issues/2)  
 **Queued Codex first slice:** [Source-preserving document core #3](https://github.com/vanderpol/scap-ng-editor/issues/3) — specification ready, **implementation not started or authorized**.  
-**External real-source fixture prerequisite:** [sample-data #1](https://github.com/vanderpol/scap-ng-editor-sample-data/issues/1) — currently placeholder directories; fixtures not yet populated.
+**External real-source fixtures:** [Pinned r3 six-case manifest](https://github.com/vanderpol/scap-ng-editor-sample-data/blob/main/manifests/pinned-real-stig-fixtures.json) — six real Rules and linked automated Assessments extracted byte-for-byte with [green source/closure gate](https://github.com/vanderpol/scap-ng-editor-sample-data/actions/runs/38833981101).
 **Future product decision:** [Full workbench vs. editor entrypoint #1](https://github.com/vanderpol/scap-ng-editor/issues/1)
 
 > **The shared contract for ChatGPT, Codex, and human contributors.** Read this file and root `AGENTS.md` before beginning development. Commit updates to this file alongside meaningful implementation milestones. The **repository** is the communication medium; chat prompts are not the durable project specification. This file is not an autonomous job queue or a signal that a task is running.
@@ -56,7 +56,7 @@ The exact schema source, research overlay boundary, pinned-version loader contra
 - **Green upstream:** [0.4 independent JSON-only static/schema/reference gate](https://github.com/vanderpol/scap-ng/actions/runs/38830995691) on r3: 4,001 JSON documents, 872 **unique** automated Assessments and 1,375 native Test nodes, 2,958 Rule-choice links closed. [0.3 six-anchor current converter and downstream compilation](https://github.com/vanderpol/scap-ng/actions/runs/38829943744) green.
 - **Not green by inference:** source-equivalent 0.4 native YAML/JSON bundle compilation ([#232](https://github.com/vanderpol/scap-ng/issues/232)), independent runtime scanner semantics, or owner-approved normative Test/group/field vocabulary ([#227](https://github.com/vanderpol/scap-ng/issues/227), [#229](https://github.com/vanderpol/scap-ng/issues/229)).
 - **Hand off when authorized:** give Codex **editor issue [#3](https://github.com/vanderpol/scap-ng-editor/issues/3)**, this living plan, and `AGENTS.md`. The initial outcome is a source-preserving, version-pinned headless Assessment document core with real external fixtures, **not** an opinionated 0.4 GUI or converter.
-- **Fixtures gap:** the `scap-ng-editor-sample-data` repo has placeholders rather than the promised real files. [Sample-data #1](https://github.com/vanderpol/scap-ng-editor-sample-data/issues/1) tracks the pinned smoke set and provenance. Do not report real fixture tests as passed until it is populated.
+- **Fixtures source gate: PASS** — [r3 sample manifest](https://github.com/vanderpol/scap-ng-editor-sample-data/blob/main/manifests/pinned-real-stig-fixtures.json), [run 38833981101](https://github.com/vanderpol/scap-ng-editor-sample-data/actions/runs/38833981101): six archived real Rules and six linked automated Assessment documents (including shared source), exact copied bytes, verified release SHA-256, seven negative/positive extractor tests. **These are upstream fixture-generation tests, not editor round-trip, 0.4 compiler or scanner tests.**
 
 ## Current milestone: safe editor foundations
 
@@ -83,7 +83,7 @@ The exact schema source, research overlay boundary, pinned-version loader contra
 
 Use **fixtures from the external sample-data repository**, not copied snapshots of the SCAP-NG corpus committed here. Narrow the tests first, then widen to production examples. Do not begin an opinionated capability form before semantics and snapshot mapping are approved.
 
-**First demonstration corpus:** RHEL9 `SV-257851`; Windows11 `SV-253254` and `SV-253495`; RHEL9 `SV-257889`; one deep Variable/Filter/shared-Assessment example. Keep the pinned 0.4 Joval research candidate clearly labeled non-normative.
+**First demonstration corpus:** verified r3 source-backed RHEL9 `SV-257851`/`SV-257889`, Windows11 `SV-253254`/`SV-253495`, Apache `SV-214228`, and DNS `SV-259345` now reside in the [external fixture manifest](https://github.com/vanderpol/scap-ng-editor-sample-data/blob/main/manifests/pinned-real-stig-fixtures.json). Add more fixtures for multi-Assessment dependency editing when necessary. Keep the pinned 0.4 Joval candidate clearly labeled non-normative.
 
 ## Evidence / completed
 
