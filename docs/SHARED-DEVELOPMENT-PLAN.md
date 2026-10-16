@@ -4,6 +4,8 @@
 **Status:** planning and foundation work only; **no editor application has been implemented or validated yet**. New commits must cite real GitHub issues.  
 **Repository:** `vanderpol/scap-ng-editor` (`main`)  
 **Primary work item:** [Assessment-first MVP #2](https://github.com/vanderpol/scap-ng-editor/issues/2)  
+**Queued Codex first slice:** [Source-preserving document core #3](https://github.com/vanderpol/scap-ng-editor/issues/3) — specification ready, **implementation not started or authorized**.  
+**External real-source fixture prerequisite:** [sample-data #1](https://github.com/vanderpol/scap-ng-editor-sample-data/issues/1) — currently placeholder directories; fixtures not yet populated.
 **Future product decision:** [Full workbench vs. editor entrypoint #1](https://github.com/vanderpol/scap-ng-editor/issues/1)
 
 > **The shared contract for ChatGPT, Codex, and human contributors.** Read this file and root `AGENTS.md` before beginning development. Commit updates to this file alongside meaningful implementation milestones. The **repository** is the communication medium; chat prompts are not the durable project specification. This file is not an autonomous job queue or a signal that a task is running.
@@ -37,7 +39,7 @@ All commits MUST contain a relevant `#<issue number>`, for example `Refs #2`, `F
 
 ## External 0.4 schema linkage
 
-The exact schema source, research overlay boundary, pinned-version loader contract, and current implementation status are documented in [SCHEMA-INPUT-CONTRACT.md](SCHEMA-INPUT-CONTRACT.md). **No editor code is linked to the draft schema yet.** The source is `vanderpol/scap-ng/schema/v0.4.0/`; the Joval scoped grammar remains an explicitly separate research overlay. The six-STIG Rule choice closure defect was fixed in [release r3](https://github.com/vanderpol/scap-ng/releases/tag/v0.4.0-joval-meeting-preview-20261015-r3) (2,958/2,958 references resolved, [#230](https://github.com/vanderpol/scap-ng/issues/230) complete). The 0.4 semantic gate [#229](https://github.com/vanderpol/scap-ng/issues/229) and Rule-reference closure [#230](https://github.com/vanderpol/scap-ng/issues/230) precede Codex implementation.
+The exact schema source, research overlay boundary, pinned-version loader contract, and current implementation status are documented in [SCHEMA-INPUT-CONTRACT.md](SCHEMA-INPUT-CONTRACT.md). **No editor code is linked to the draft schema yet.** The source is `vanderpol/scap-ng/schema/v0.4.0/`; the Joval scoped grammar remains an explicitly separate research overlay. The six-STIG Rule choice closure defect was fixed in [release r3](https://github.com/vanderpol/scap-ng/releases/tag/v0.4.0-joval-meeting-preview-20261015-r3) (2,958/2,958 references resolved, [#230](https://github.com/vanderpol/scap-ng/issues/230) complete). The 0.4 semantic gate [#229](https://github.com/vanderpol/scap-ng/issues/229) remains open; [#230](https://github.com/vanderpol/scap-ng/issues/230) is completed. The separate 0.4 independent YAML/JSON compilation gate is [#232](https://github.com/vanderpol/scap-ng/issues/232). **Only the queued implementation issue #3, not this plan, can define the first Codex slice, and it is not authorization to run it.**
 
 ## Current dependency: deeper SCAP-NG 0.4 tests before Codex implementation
 
@@ -47,6 +49,14 @@ The exact schema source, research overlay boundary, pinned-version loader contra
 - **Still to prove:** six-state outcomes across all nested scopes, valid negative and exceptional combinations, if/else vs OVAL Boolean non-equivalence boundaries, foreach/filters/dynamic Variables/records, independent JSON reference resolution/build, and current-main converter fidelity.
 - **Gate:** don't start vocabulary-specific forms or generated Assessment semantics until their versioned test/reference contract is reviewed and passed. Source-safe parser design, external schema loading, and interface research are semantically independent but should only be coded when separately authorized.
 - **Codex first prototype effort planning:** rough allowance of 1–2 weeks of iterative engineering for a basic assisted editor after this gate; not a guarantee or an ongoing background task.
+
+## October 16 readiness checkpoint (planning, not coding)
+
+- **Meeting input:** [Joval one-page agenda and real examples](https://github.com/vanderpol/scap-ng/blob/main/research/assessment-simplification/compact-authoring-04/JOVAL-MEETING-2026-10-16.md), with explicit source-vs-candidate limitations. Outcomes may revise the schema adapter but must not silently rewrite this editor's authoring grammar.
+- **Green upstream:** [0.4 independent JSON-only static/schema/reference gate](https://github.com/vanderpol/scap-ng/actions/runs/38830995691) on r3: 4,001 JSON documents, 872 **unique** automated Assessments and 1,375 native Test nodes, 2,958 Rule-choice links closed. [0.3 six-anchor current converter and downstream compilation](https://github.com/vanderpol/scap-ng/actions/runs/38829943744) green.
+- **Not green by inference:** source-equivalent 0.4 native YAML/JSON bundle compilation ([#232](https://github.com/vanderpol/scap-ng/issues/232)), independent runtime scanner semantics, or owner-approved normative Test/group/field vocabulary ([#227](https://github.com/vanderpol/scap-ng/issues/227), [#229](https://github.com/vanderpol/scap-ng/issues/229)).
+- **Hand off when authorized:** give Codex **editor issue [#3](https://github.com/vanderpol/scap-ng-editor/issues/3)**, this living plan, and `AGENTS.md`. The initial outcome is a source-preserving, version-pinned headless Assessment document core with real external fixtures, **not** an opinionated 0.4 GUI or converter.
+- **Fixtures gap:** the `scap-ng-editor-sample-data` repo has placeholders rather than the promised real files. [Sample-data #1](https://github.com/vanderpol/scap-ng-editor-sample-data/issues/1) tracks the pinned smoke set and provenance. Do not report real fixture tests as passed until it is populated.
 
 ## Current milestone: safe editor foundations
 
