@@ -22,6 +22,10 @@ The online conversational agent is **one client**, not an architectural prerequi
 
 “AI-first” describes the **conversational authoring workflow**, not an OpenAI-only account model. Cloud providers such as Claude/Gemini/Grok/OpenAI, approved local models, direct custom endpoints and a possible future public SCAP-NG authoring agent should all use the same tool contract. A strict no-AI mode remains complete. **The tested scanner's evaluation kernel remains authoritative regardless of which model authors a draft.** See [model-neutral contract](MODEL-NEUTRAL-AI-INTEGRATION.md) and [air-gapped extension contract](OFFLINE-VSCODE-EDITOR-CONTRACT.md). A hosted agent is only a candidate, not already available.
 
+## Version-bound authoring, not a frozen vocabulary
+
+Every agent session selects one immutable SCAP-NG language profile (source commit/tag, coherent schema and capabilities, approved examples, authoring guidance, and explicit optional research overlay). The agent drafts to that selected profile, so routine key renames and structural revisions should require profile changes instead of rebuilding the agent. [Detailed version profile contract](AGENT-VERSION-PROFILE-CONTRACT.md) and [October 22 Board demo #6](https://github.com/vanderpol/scap-ng-editor/issues/6). Never silently upgrade existing native files or presume semantics equivalence; scanner results remain entirely outside the AI's authority.
+
 ## Product hypothesis
 
 The primary authoring experience could be **conversation + proof**, rather than hand-writing hundreds of lines of 0.4 YAML. An agent reads an authoritative STIG Rule/check and associated SCAP 1.4 OVAL (if present), proposes a complete Assessment, explains what it will collect and what makes the result true/false/unknown/error, generates *synthetic scenario proposals*, and returns a source-linked diff for human approval.
