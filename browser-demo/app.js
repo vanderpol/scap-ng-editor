@@ -228,6 +228,34 @@
       const v=a.variables[id];const deps=v?[...findRefs(v.expression,"variable")]:[];return '<details class="structure-node"><summary>'+esc(v?.title||id)+(deps.length?' <small>← depends on '+esc(deps.map(x=>a.variables[x]?.title||x).join(", "))+'</small>':"")+'</summary><p><code>'+esc(id)+'</code></p>'+(v?walk(v.expression,["assessment","variables",id,"expression"],"expression"):'<p class="warning">Definition not loaded</p>')+'</details>';
     }).join("")+'</div></details>';
   }
+  function objectTrace(a,t){
+    if(!a.shared_objects)return "";
+    const variableRefs=new Set(findRefs(t,"variable")),seenVars=new Set();
+    const pendingVars=[...variableRefs];
+    const pendingObjects=[];
+    const appendObjectRefs=node=>{
+      for(const id of findRefs(node,"object"))if(a.shared_objects[id])pendingObjects.push(id);
+      for(const id of findRefs(node,"in"))if(a.shared_objects[id])pendingObjects.push(id);
+    };
+    appendObjectRefs(t);
+    while(pendingVars.length){
+      const id=pendingVars.pop();if(seenVars.has(id))continue;seenVars.add(id);
+      const v=a.variables?.[id];if(!v)continue;
+      appendObjectRefs(v);
+      for(const dep of findRefs(v,"variable"))if(!seenVars.has(dep))pendingVars.push(dep);
+    }
+    const seenObjects=new Set();
+    while(pendingObjects.length){
+      const id=pendingObjects.pop();if(seenObjects.has(id))continue;seenObjects.add(id);
+      const o=a.shared_objects[id];if(o)appendObjectRefs(o);
+    }
+    if(!seenObjects.size)return "";
+    return '<details class="dependency-group"><summary>Shared Object / collection dependencies ('+seenObjects.size+')</summary><p class="help">These Objects feed collections. They are not extra AND/OR Tests.</p><div class="structure-children">'+[...seenObjects].map(id=>{
+      const o=a.shared_objects[id];
+      return '<details class="structure-node"><summary>'+esc(o?.object_title||id)+' <small>'+esc(id)+'</small></summary>'+
+        (o?walk(o,["assessment","shared_objects",id],"object"):'<p class="warning">Definition unavailable</p>')+'</details>';
+    }).join("")+'</div></details>';
+  }
   function inspector(a,id,refs){
     const t=a.tests?.[id];
     if(!t)return '<section class="card" id="test-inspector"><h3>Select a Test</h3><p>Choose a leaf in the logic tree to inspect its collection and expectations.</p></section>';
@@ -251,7 +279,7 @@
       field(path.concat("states_match"),"Combine States",t.states_match,["all","any","none","one"])+
       field(path.concat("state_fields_require"),"Field requirement",t.state_fields_require,levels)+
       field(path.concat("reported_elements"),"Reported elements",t.reported_elements)+
-      '</div></details>'+variableTrace(a,t)+
+      '</div></details>'+objectTrace(a,t)+variableTrace(a,t)+
       '</section>';
   }
   function overview(){
