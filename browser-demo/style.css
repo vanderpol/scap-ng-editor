@@ -40,3 +40,14 @@
 .test-inspector .property{grid-template-columns:minmax(0,1fr);gap:4px;align-items:stretch}
 .test-inspector .property label{font-size:12px;line-height:1.4;color:#344e67}
 .test-inspector .property select{min-width:0;max-width:100%}
+
+/* A Test is one human-visible check: data source and expectations stay together. */
+.combined-check{background:#f5f9fd;border:1px solid #d3e1ef;border-radius:9px;padding:13px 15px;margin:13px 0 15px}
+.combined-check h4{margin:0 0 9px;font-size:14px;color:#1d4a71}
+.check-sentence{color:#243d56!important;font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+.check-sentence strong{color:#1a5e99}
+.check-scope{font-size:12px;line-height:1.6;padding:9px;border-left:3px solid #a1bfd8;background:white;border-radius:4px;overflow-wrap:anywhere}
+.inline-predicate{margin-top:12px;padding:10px;border:1px solid #c8dcf0;border-radius:6px;background:white}
+.inline-predicate .property{display:grid;grid-template-columns:1fr;gap:5px}
+.inline-predicate label{font-weight:600}
+.test-inspector .inspector-section h4{font-size:12px;margin:14px 0 8px;color:#3a5771}
