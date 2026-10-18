@@ -35,3 +35,8 @@
 @media(max-width:720px){.structure-children .property{grid-template-columns:1fr}.logic-pane{max-height:none}.logic-leaf-title{font-size:12px}.structure-children{margin-left:5px;padding-left:8px}}
 
 .logic-leaf-summary{display:block;margin-top:5px;color:#425a73;font-size:11px;line-height:1.45;overflow-wrap:anywhere}
+
+/* English-first labels need room above their precise field controls. */
+.test-inspector .property{grid-template-columns:minmax(0,1fr);gap:4px;align-items:stretch}
+.test-inspector .property label{font-size:12px;line-height:1.4;color:#344e67}
+.test-inspector .property select{min-width:0;max-width:100%}
