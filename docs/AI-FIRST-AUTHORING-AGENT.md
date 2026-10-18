@@ -18,6 +18,10 @@ See the [versioned, source-backed evaluation-core contract](https://github.com/v
 
 The online conversational agent is **one client**, not an architectural prerequisite. [Offline VS Code requirement](OFFLINE-VSCODE-EDITOR-CONTRACT.md) ([issue #5](https://github.com/vanderpol/scap-ng-editor/issues/5)) mandates a complete authoring experience—local source import, reviewed patterns/forms, versioned schema/reference diagnostics, sample fixture editing and local save/export—with a VSIX and pinned offline packs **and no network connection or LLM dependency**. Local models are an optional later capability subject to policy and available resources. The cloud model cannot stand in for the tested scanner evaluation kernel. Use one native document model and shared versioned semantics across connected/cloud and air-gapped editor clients.
 
+## AI vendor neutrality is a product requirement
+
+“AI-first” describes the **conversational authoring workflow**, not an OpenAI-only account model. Cloud providers such as Claude/Gemini/Grok/OpenAI, approved local models, direct custom endpoints and a possible future public SCAP-NG authoring agent should all use the same tool contract. A strict no-AI mode remains complete. **The tested scanner's evaluation kernel remains authoritative regardless of which model authors a draft.** See [model-neutral contract](MODEL-NEUTRAL-AI-INTEGRATION.md) and [air-gapped extension contract](OFFLINE-VSCODE-EDITOR-CONTRACT.md). A hosted agent is only a candidate, not already available.
+
 ## Product hypothesis
 
 The primary authoring experience could be **conversation + proof**, rather than hand-writing hundreds of lines of 0.4 YAML. An agent reads an authoritative STIG Rule/check and associated SCAP 1.4 OVAL (if present), proposes a complete Assessment, explains what it will collect and what makes the result true/false/unknown/error, generates *synthetic scenario proposals*, and returns a source-linked diff for human approval.
