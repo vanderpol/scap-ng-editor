@@ -18,6 +18,10 @@ The Joval technical meeting uses this [one-page October 16 agenda](https://githu
 
 [AI-first authoring agent over a shared validation/test core](docs/AI-FIRST-AUTHORING-AGENT.md) — research [issue #4](https://github.com/vanderpol/scap-ng-editor/issues/4). Investigates conversational Assessment generation, synthetic sample-data tests, independent six-state evaluation and human-reviewed Git patches, sharing the same version-pinned source engine with VS Code or a future graphical workbench. **No agent, editor backend or new compiler has been commissioned or implemented; semantic gate #229 remains open.**
 
+## Version-bound agent for the October 22 Board demonstration
+
+[Selected-version agent profile](docs/AGENT-VERSION-PROFILE-CONTRACT.md) and [reusable Board-demo conversational charter](docs/BOARD-DEMO-VERSION-BOUND-AGENT-CHARTER.md) ([issue #6](https://github.com/vanderpol/scap-ng-editor/issues/6)). The initial demonstration will use pinned pre-alpha source and examples, showing the difference between base 0.4 and a research overlay. Ordinary vocabulary changes should update the agent's version profile; semantic changes and existing file migration require separate review. **There is no implemented dynamic profile loader or public agent yet.**
+
 ## Configurable AI providers — no vendor lock-in
 
 **[Model-neutral AI design](docs/MODEL-NEUTRAL-AI-INTEGRATION.md):** optional, user-selected Claude/Gemini/Grok/OpenAI/compatible endpoints, approved on-prem/local inference, or a future public/self-hosted SCAP-NG agent. **No AI at all** remains a fully supported mode. Scanner results are produced only by the tested SCAP-NG evaluation core, never by a selected model. Tracked in [#4](https://github.com/vanderpol/scap-ng-editor/issues/4) and [#5](https://github.com/vanderpol/scap-ng-editor/issues/5).
