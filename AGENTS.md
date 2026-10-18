@@ -1,5 +1,13 @@
 # SCAP-NG Editor development invariants
 
+## Owner requirement: retrieve trusted Assessment prior art, then modernize using NG (2026-10-18)
+
+- Before drafting an Assessment, search the current content corpus, shared collections, older/newer OS benchmark versions and trusted original STIG/OVAL sources for similar requirements. When public search is unavailable, use user-supplied/uploaded/offline benchmark sources instead. Document search coverage and source identities.
+- A matching Rule/CCI/title is **not proof of behavioral or platform equivalence**; compare applicability, selectors, Item/field scopes and source check meanings. Never fabricate a source match.
+- Prefer source-grounded **redesign using supported NG features** over literal XML-to-YAML transliteration. Preserve intended results, error/unknown statuses, evidence, records and independent logical branches; report unresolved cases.
+- Show the original logic, complete optimized NG draft, semantic uncertainty and exact diff to the human. Only the tested scanner evaluation kernel reports actual Assessment results; AI does not self-validate.
+- See [retrieval-guided modernization contract](docs/ASSESSMENT-PRIOR-ART-REUSE-CONTRACT.md), private [plugin scaffold](agent-plugin/README.md) and [Board demo #6](https://github.com/vanderpol/scap-ng-editor/issues/6). No schema/compiler change follows from this authoring research.
+
 ## Owner requirement: agent binds to a selected SCAP-NG version (2026-10-18)
 
 - The agent SHALL load an explicit, immutable SCAP-NG version profile (repo/ref/commit, schema refs, capability catalog, source examples, glossary, known limitations and optional *separately pinned* research overlay). No `main` or mixed schema snapshot as an implicit validation authority.
