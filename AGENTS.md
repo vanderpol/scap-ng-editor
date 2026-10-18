@@ -1,5 +1,13 @@
 # SCAP-NG Editor development invariants
 
+## Owner requirement: agent binds to a selected SCAP-NG version (2026-10-18)
+
+- The agent SHALL load an explicit, immutable SCAP-NG version profile (repo/ref/commit, schema refs, capability catalog, source examples, glossary, known limitations and optional *separately pinned* research overlay). No `main` or mixed schema snapshot as an implicit validation authority.
+- The same agent/model-independent tool contract shall **adapt its drafting** to vocabulary/structure changes through the selected profile, not by hard-coding current 0.4 field names or requiring a prompt rewrite for ordinary renames.
+- Changes to semantics, field/record requirement inheritance, OVAL value expansion, `if/else` status behavior, or missing-data results are **NOT** safe automatic rewrites. They require explicit reviewed migration and independent scanner conformance.
+- Show version/profile/experimental status, source evidence pin and validation/scanner availability for every draft. Opening an old document must not silently upgrade it.
+- See [version-bound agent contract](docs/AGENT-VERSION-PROFILE-CONTRACT.md) and [Board demo #6](https://github.com/vanderpol/scap-ng-editor/issues/6). No code implementation has been authorized.
+
 ## Owner requirement: provider-neutral optional AI (2026-10-18)
 
 - No SCAP-NG editor client SHALL require a ChatGPT/OpenAI, GitHub Copilot, Claude, Gemini, Grok or any other AI provider to author/validate native content.
