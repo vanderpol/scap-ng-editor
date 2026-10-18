@@ -313,17 +313,59 @@
       (matcher.require?'<p class="help">Matching requirement for this field (require): '+esc(requirementDescription(matcher.require))+'</p>':"")+
       '</div>';
   }
+  // Applies at the Test's collected-Item population, not to State fields.
+  // Never use these English sentences as substitute serialized schema values.
+  function resultCountExplanation(requirement){
+    const counts={
+      at_least_one_exists_and_all_match:{
+        found:"At least one result.",
+        match:"Every result found must satisfy the requirements above."
+      },
+      at_least_one_exists_and_some_match:{
+        found:"At least one result.",
+        match:"At least one of the results must satisfy the requirements above."
+      },
+      at_least_one_exists_and_only_one_matches:{
+        found:"At least one result.",
+        match:"Exactly one of the results must satisfy the requirements above."
+      },
+      only_one_exists_and_matches:{
+        found:"Exactly one result.",
+        match:"That single result must satisfy the requirements above."
+      },
+      none_exist:{
+        found:"No results.",
+        match:"No matching comparison is needed when no results are permitted."
+      },
+      none_match:{
+        found:"Not specified by this matching requirement.",
+        match:"None of the results may satisfy the requirements above."
+      },
+      may_be_absent_and_all_match:{
+        found:"No minimum; finding none is allowed.",
+        match:"If any results are found, every result must satisfy the requirements above."
+      }
+    };
+    return counts[requirement]||{
+      found:"Review the exact requirement in the expanded details.",
+      match:"This editor has no reviewed plain-English wording for this option."
+    };
+  }
   function combinedReading(a,id,t){
     const from=humanCollection(a,t),expectation=summarizeTest(t);
     const mode=t.states_match==="any"?"At least one alternative must match":t.states_match==="all"?"All alternatives must match":t.states_match==="none"?"No alternative may match":t.states_match==="one"?"Exactly one alternative must match":"State combination shown in details";
+    const counts=resultCountExplanation(t.collected_items_require);
     return '<section class="combined-check" aria-label="Readable test description">'+
       '<h4>What this check means</h4>'+
       '<p class="check-sentence"><strong>Look at</strong> '+esc(from.text)+'. <small>'+esc(from.detail)+'</small></p>'+
       '<p class="check-sentence"><strong>Require</strong> '+esc(expectation)+'.</p>'+
-      '<p class="check-scope"><strong>Across collected entries:</strong> '+esc(requirementDescription(t.collected_items_require))+
-      (t.states_match?' · <strong>Alternatives:</strong> '+esc(mode):"")+
-      (t.state_fields_require?' · <strong>Across State fields:</strong> '+esc(requirementDescription(t.state_fields_require)):"")+
-      '</p>'+oneFieldEditor(id,t)+
+      '<div class="check-scope"><strong>How many results are required?</strong>'+
+      '<div class="result-requirement"><span>Must be found:</span> '+esc(counts.found)+'</div>'+
+      '<div class="result-requirement"><span>Must match:</span> '+esc(counts.match)+'</div>'+
+      (t.states_match?'<div class="result-requirement"><span>If there are alternative conditions:</span> '+esc(mode)+'.</div>':"")+
+      (t.state_fields_require?'<div class="result-requirement"><span>Conditions on individual fields:</span> '+esc(requirementDescription(t.state_fields_require))+'.</div>':"")+
+      '<small>These counts apply to results from “Look at,” not to fields within a single result. Exact settings are under advanced details.</small>'+
+      '</div>'+oneFieldEditor(id,t)+
       '<p class="help">This is a readable projection, not a second source format. Expanded details preserve all authored requirements and collection references.</p>'+
       '</section>';
   }
