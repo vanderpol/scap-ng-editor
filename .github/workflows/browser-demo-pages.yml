@@ -30,6 +30,7 @@ jobs:
           test -s browser-demo/index.html
           test -s browser-demo/style.css
           test -s browser-demo/app.js
+          test -s browser-demo/site-config.js
           test -s browser-demo/vendor/js-yaml.min.js
           node --check browser-demo/app.js
           node --check browser-demo/vendor/js-yaml.min.js
