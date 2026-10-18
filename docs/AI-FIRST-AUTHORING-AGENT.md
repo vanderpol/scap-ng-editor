@@ -2,6 +2,12 @@
 
 **18 October 2026 · Research / not authorized implementation · [Editor issue #4](https://github.com/vanderpol/scap-ng-editor/issues/4).** This builds on [Assessment-first MVP](ASSESSMENT-FIRST-MVP.md), [current editor recommendation](EDITOR-IMPLEMENTATION-RECOMMENDATION.md), [shared development plan](SHARED-DEVELOPMENT-PLAN.md), and [SCAP-NG sample-data bench #241](https://github.com/vanderpol/scap-ng/issues/241). **No normative schema, compiler or scanner work is authorized by this proposal.**
 
+## Owner-authorized trust boundary — supersedes preliminary evaluator proposals (18 October)
+
+**AI is for creation and assistance ONLY. AI SHALL NOT decide validity or report assessment results.** A versioned **deterministic validator** may report syntax/schema/reference diagnostics; a **tested SCAP-NG scanner** is the only authority for actual Assessment outcomes against synthetic or real evidence. A human approves source and changes but cannot substitute that approval for independent scanner correctness. The existing Python reference truth tables, narrow Linux/WMI pilots and supplied-Test-expression tests are research aids **not an accepted scanner**.
+
+**Until a tested scanner exists for a given capability and result path, the editor must show “NOT SCANNER-VERIFIED / ASSESSMENT RESULT UNAVAILABLE”.** It may collect synthetic inputs and author-proposed *expected* results for future tests, but shall not label an AI prediction, Python reference-oracle output or local configuration-lint preview as the Assessment's authoritative true/false/error/unknown. The distinction between technical schema validation, reference-model diagnostics, and scanner verification must remain conspicuous and unambiguous. The paragraphs below describing deterministic evaluators are **proposals for future scanner integration or internal research**, not current authority to return final assessment verdicts.
+
 ## Product hypothesis
 
 The primary authoring experience could be **conversation + proof**, rather than hand-writing hundreds of lines of 0.4 YAML. An agent reads an authoritative STIG Rule/check and associated SCAP 1.4 OVAL (if present), proposes a complete Assessment, explains what it will collect and what makes the result true/false/unknown/error, generates *synthetic scenario proposals*, and returns a source-linked diff for human approval.
