@@ -288,7 +288,7 @@
     if(o.collect?.command){
       const cmd=o.collect.command;
       const title=typeof cmd==="object"&&cmd.variable?a.variables?.[cmd.variable]?.title||cmd.variable:null;
-      return {text:source+" gathered by "+(title?"command built from "+title:typeof cmd==="string"?cmd:"a defined command"),detail:ref?"Shared source: "+ref:"Local source"};
+      return {text:source+" gathered by "+(title?"a command assembled from "+title:typeof cmd==="string"?"the command shown below":"an authored command expression"),detail:ref?"Shared source: "+ref:"Local source"};
     }
     if(o.set)return {text:source+" derived from a "+String(o.set.operator||"specified")+" set of collections; see source dependencies",detail:ref?"Shared source: "+ref:"Local source"};
     if(o.for_each)return {text:source+" collected for each "+String(o.for_each.item||"item")+" from "+String(o.for_each.in||"the referenced source"),detail:ref?"Shared source: "+ref:"Local source"};
@@ -351,6 +351,33 @@
       match:"This editor has no reviewed plain-English wording for this option."
     };
   }
+  // Explain the exact authored collection command without attempting execution,
+  // variable substitution, shell expansion, or evaluation.
+  function shellCommandDetails(a,id,t){
+    const objectRef=typeof t.object==="string"?t.object:null;
+    const o=objectRef?a.shared_objects?.[objectRef]:t.object;
+    if(t.capability!=="independent.shellcommand"&&o?.capability!=="independent.shellcommand")return "";
+    const command=o?.collect?.command,shell=o?.collect?.shell;
+    const header='<div class="shellcommand-panel"><div class="shellcommand-heading">Command used to collect the data <small>(shellcommand)</small></div>'+
+      (shell?'<p class="help">Interpreter: <code>'+esc(shell)+'</code></p>':"");
+    if(typeof command==="string"){
+      const base=objectRef?["assessment","shared_objects",objectRef,"collect","command"]:["assessment","tests",id,"object","collect","command"];
+      const path=encodeURIComponent(JSON.stringify(base));
+      return header+'<label class="help" for="authored-command">Authored command string (editable draft)</label>'+
+        '<textarea id="authored-command" class="command-editor" spellcheck="false" data-field="'+path+'" aria-label="Collection command string">'+esc(command)+'</textarea>'+
+        '<p class="help">This is the exact authored command, not something the editor has executed. Changing it currently reformats the exported YAML; review the source before use.</p></div>';
+    }
+    if(command&&typeof command==="object"&&typeof command.variable==="string"){
+      const name=command.variable,v=a.variables?.[name];
+      return header+'<p>There is <strong>no fixed command string</strong> in this Test. The command comes from the Variable <code>'+esc(name)+'</code>'+(v?.title?' ('+esc(v.title)+')':"")+'.</p>'+
+        '<p class="help">The runtime command depends on the Variable expression and any collected values. This editor does not resolve or execute it.</p>'+
+        (v?'<details class="structure-node"><summary>Show how the command is constructed</summary><div class="structure-children">'+
+          walk(v.expression,["assessment","variables",name,"expression"],"expression")+
+          '</div></details>':'<p class="warning">Referenced command Variable was not found in this Assessment.</p>')+
+        '</div>';
+    }
+    return header+'<p class="warning">No directly displayable command string is present. Inspect the complete collection source below.</p></div>';
+  }
   function combinedReading(a,id,t){
     const from=humanCollection(a,t),expectation=summarizeTest(t);
     const mode=t.states_match==="any"?"At least one alternative must match":t.states_match==="all"?"All alternatives must match":t.states_match==="none"?"No alternative may match":t.states_match==="one"?"Exactly one alternative must match":"State combination shown in details";
@@ -358,6 +385,7 @@
     return '<section class="combined-check" aria-label="Readable test description">'+
       '<h4>What this check means</h4>'+
       '<p class="check-sentence"><strong>Look at</strong> '+esc(from.text)+'. <small>'+esc(from.detail)+'</small></p>'+
+      shellCommandDetails(a,id,t)+
       '<p class="check-sentence"><strong>Require</strong> '+esc(expectation)+'.</p>'+
       '<div class="check-scope"><strong>How many results are required?</strong>'+
       '<div class="result-requirement"><span>Must be found:</span> '+esc(counts.found)+'</div>'+
