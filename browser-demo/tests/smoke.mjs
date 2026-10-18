@@ -27,7 +27,9 @@ try {
   assert((await page.locator('#test-inspector').innerText()).includes('windows-userright-object'), 'shared Object should be reachable in Test details');
 
   assert((await page.locator('#test-inspector .combined-check').innerText()).includes('Require'), 'matching conditions must be displayed in the same card as collection');
-  assert((await page.locator('#test-inspector .combined-check').innerText()).includes('Across collected entries:'), 'item cardinality cannot be hidden by the combined summary');
+  assert((await page.locator('#test-inspector .combined-check').innerText()).includes('How many results are required?'), 'result-count wording must be human-readable');
+  assert((await page.locator('#test-inspector .combined-check').innerText()).includes('Must be found:'), 'result existence must be visible');
+  assert((await page.locator('#test-inspector .combined-check').innerText()).includes('Must match:'), 'matching count must be visible independently');
   await page.locator('#test-inspector .inspector-section').first().locator('summary').click();
   assert((await page.locator('#test-inspector').innerText()).includes('States:'), 'full nested State structure must remain accessible');
   await page.locator('#test-inspector .inspector-section').last().locator('summary').click();
