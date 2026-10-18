@@ -94,7 +94,7 @@
     const enc=encodeURIComponent(JSON.stringify(path));
     const v=String(value);
     const optionLabel=x=>levels.includes(x)?requirementDescription(x)+" ("+x+")":
-      ["all","any","none","one"].includes(x)?({all:"All conditions",any:"Any condition",none:"No conditions",one:"Exactly one condition"}[x])+" ("+x+")":x.replaceAll("_"," ");
+      ["all","any","none","one"].includes(x)?({all:"All conditions must match",any:"At least one condition must match",none:"No conditions may match",one:"Exactly one condition must match"}[x])+" ("+x+")":x.replaceAll("_"," ");
     const choice=Array.isArray(opts)?'<select data-field="'+enc+'" aria-label="'+esc(name)+'">'+[...new Set([v,...opts])].map(x=>'<option value="'+esc(x)+'" '+(x===v?"selected":"")+'>'+esc(optionLabel(x))+'</option>').join("")+'</select>':'<input type="text" data-field="'+enc+'" value="'+esc(v)+'" aria-label="'+esc(name)+'">';
     return '<div class="property"><label>'+esc(name)+'</label>'+choice+'</div>';
   }
@@ -273,7 +273,7 @@
       (refs[id]>1?'<p class="reference-note">Shared Test: '+refs[id]+' references in the logic tree; edits affect this one definition.</p>':"")+
       '<div class="unimplemented-actions"><button type="button" disabled title="Requires source-preserving structural editing">+ Add State or field</button><button type="button" disabled title="Requires dependency-safe unlink/delete">Remove / unlink</button><span>Structural editing is planned; use Source for now.</span></div>'+
       '<div class="summary-line"><strong>Which collected entries must match (collected_items_require):</strong> '+esc(requirementDescription(t.collected_items_require))+'</div>'+
-      (t.states_match?'<div class="summary-line"><strong>How the alternatives are combined (states_match):</strong> '+esc(t.states_match==="any"?"ANY of the States":t.states_match==="all"?"ALL of the States":t.states_match.replaceAll("_"," "))+'</div>':"")+
+      (t.states_match?'<div class="summary-line"><strong>How the alternatives are combined (states_match):</strong> '+esc(t.states_match==="any"?"At least one condition must match (any)":t.states_match==="all"?"All conditions must match (all)":t.states_match==="none"?"No conditions may match (none)":t.states_match==="one"?"Exactly one condition must match (one)":t.states_match.replaceAll("_"," "))+'</div>':"")+
       (t.state_fields_require?'<div class="summary-line"><strong>Which expected fields must match (state_fields_require):</strong> '+esc(requirementDescription(t.state_fields_require))+'</div>':"")+
       '<details class="inspector-section" open><summary>1. Where the data comes from (Object) '+(typeof o==="string"?"(shared definition)":"(local definition)")+'</summary><div class="structure-children">'+
       (typeof o==="string"?'<p class="reference-note">References the shared Object <code>'+esc(o)+'</code>. This is not an additional AND condition.</p>'+(shared?walk(shared,["assessment","shared_objects",o],"object"): '<p class="warning">Shared Object definition not found in this Assessment.</p>'):walk(o,path.concat("object"),"object"))+
