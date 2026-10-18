@@ -1,5 +1,14 @@
 # SCAP-NG Editor development invariants
 
+## Owner decision: AI is authoring assistant, never assessment authority (2026-10-18)
+
+- AI MAY propose Assessments, prose explanations, sample inputs and expected-case ideas. It SHALL NOT declare generated content semantically valid, correct, compliant, passing or OVAL-equivalent.
+- Syntax/schema/reference diagnostics are produced by **versioned deterministic tools**, never by an LLM judgment.
+- **Authoritative assessment outcomes** (including on sample configuration data) SHALL come from a **tested, validated SCAP-NG scanner**. A Python OVAL truth-table reference, bounded pilot, fixture oracle, AI guess or generic config linter is **not** that scanner.
+- Until a suitable scanner and coverage for the requested capability are available, the editor SHALL show **NOT SCANNER-VERIFIED / NO AUTHORITATIVE ASSESSMENT RESULT**, rather than a claimed Assessment true/false/unknown/error. Reference research predictions may be displayed only as explicitly segregated, non-authoritative developer diagnostics.
+- Human approval of an AI-authored patch is separate from validated execution and does not establish correctness.
+- Do not treat issue #4's earlier exploratory language about a deterministic Python result service as scanner authorization. This owner decision supersedes that presentation; full semantic implementation remains gated.
+
 ## Shared ChatGPT / Codex handoff
 
 The **single living development plan** is [`docs/SHARED-DEVELOPMENT-PLAN.md`](docs/SHARED-DEVELOPMENT-PLAN.md). **Read it before implementing** and update its current milestone, test evidence and next task alongside meaningful work. GitHub issues hold detailed tasks and decisions; `AGENTS.md` holds enduring rules. Neither a prior chat nor an agent's unpublished scratchpad is an authoritative development plan.
