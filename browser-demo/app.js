@@ -10,9 +10,17 @@
     ["rhel_9/rules/SV-257851.rule.yaml","rule"],
     ["shared/assessments/linux/other/home-mounted-nosuid-option.assessment.yaml","assessment"],
     ["ms_windows_11/rules/SV-253495.rule.yaml","rule"],
-    ["ms_windows_11/assessments/automated/SV-253495.automated.yaml","assessment"]
+    ["ms_windows_11/assessments/automated/SV-253495.automated.yaml","assessment"],
+    ["ms_windows_11/rules/SV-253254.rule.yaml","rule"],
+    ["ms_windows_11/assessments/automated/SV-253254.automated.yaml","assessment"],
+    ["rhel_9/rules/SV-257889.rule.yaml","rule"],
+    ["shared/assessments/linux/other/initialization-files-0740-less-permissive.assessment.yaml","assessment"],
+    ["apache_server_2-4_unix_server/rules/SV-214228.rule.yaml","rule"],
+    ["apache_server_2-4_unix_server/assessments/automated/SV-214228.automated.yaml","assessment"],
+    ["ms_windows_server_dns/rules/SV-259345.rule.yaml","rule"],
+    ["ms_windows_server_dns/assessments/automated/SV-259345.automated.yaml","assessment"]
   ];
-  let docs=new Map(),ruleRows=[],chosen=null,view="guided",step=0,filter="all",search="",message="",dirtySource=false;
+  let docs=new Map(),ruleRows=[],chosen=null,selectedTest=null,view="graphical",step=0,filter="all",search="",message="",dirtySource=false;
   let sampleText="",candidate=new Map();
   const levels=["at_least_one_exists_and_all_match","at_least_one_exists_and_some_match","at_least_one_exists_and_only_one_matches","only_one_exists_and_matches","none_exist","none_match","may_be_absent_and_all_match"];
   const getNode=(obj,path)=>path.reduce((o,k)=>o==null?undefined:o[k],obj);
@@ -72,7 +80,7 @@
     $("rules").innerHTML=matches.length?matches.map(r=>'<div class="rule '+(chosen===r.id?"active":"")+'" data-id="'+esc(r.id)+'"><span class="rid">'+esc(r.id)+'</span><p>'+esc(r.title)+'</p>'+flag(r)+'</div>').join(""):'<div class="empty">No matching Rules in the loaded files.<p>Import Rule YAML to broaden the search.</p></div>';
     $("rules").querySelectorAll("[data-id]").forEach(e=>e.onclick=()=>open(e.dataset.id));
   }
-  function open(id){chosen=id;view="guided";step=0;dirtySource=false;library();render()}
+  function open(id){chosen=id;selectedTest=null;view="graphical";step=0;dirtySource=false;library();render()}
   function tabs(){
     $("tabs").querySelectorAll("[data-view]").forEach(e=>{e.classList.toggle("selected",e.dataset.view===view);e.disabled=!doc()});
     $("export").disabled=!doc();$("original").disabled=!doc();
@@ -88,37 +96,148 @@
     const choice=Array.isArray(opts)?'<select data-field="'+enc+'">'+[...new Set([v,...opts])].map(x=>'<option value="'+esc(x)+'" '+(x===v?"selected":"")+'>'+esc(x.replaceAll("_"," "))+'</option>').join("")+'</select>':'<input type="text" data-field="'+enc+'" value="'+esc(v)+'" aria-label="'+esc(name)+'">';
     return '<div class="property"><label>'+esc(name)+'</label>'+choice+'</div>';
   }
+  const prettyName = k => ({
+    collected_items_require:"Which collected Items must match?",
+    state_fields_require:"Which State fields must match?",
+    reported_elements:"Report elements",
+    states_match:"Combine State alternatives",
+    case_insensitive_equals:"equals (ignoring case)",
+    matches_regex:"matches regular expression",
+    greater_than_or_equal:"is at least",
+    less_than_or_equal:"is at most",
+    greater_than:"is greater than",
+    less_than:"is less than",
+    require:"Existence and matching",
+    for_each:"For each collected Item",
+    fields:"Record fields",
+    object:"Collected Object",
+    set:"Object Set",
+    operands:"Set operands",
+    filters:"Collection filters",
+    select:"Selection criteria",
+    collect:"Collection command",
+    expression:"Variable expression",
+    state:"Expected State"
+  })[k]||String(k).replaceAll("_"," ");
+  const requirementDescription = k => ({
+    at_least_one_exists_and_all_match:"One or more must exist; all must match",
+    at_least_one_exists_and_some_match:"One or more must exist; at least one must match",
+    at_least_one_exists_and_only_one_matches:"One or more must exist; exactly one must match",
+    only_one_exists_and_matches:"Exactly one must exist and match",
+    none_exist:"None may exist",
+    none_match:"None may match",
+    may_be_absent_and_all_match:"May be absent; any present must match"
+  })[k]||String(k||"Not explicitly specified").replaceAll("_"," ");
+  function shortClause(node,name){
+    if(!node||Array.isArray(node)||typeof node!=="object")return "";
+    const ops=["case_insensitive_equals","equals","matches_regex","greater_than_or_equal","less_than_or_equal","greater_than","less_than","from"];
+    const key=ops.find(k=>Object.hasOwn(node,k));
+    if(!key)return "";
+    const value=node[key];
+    return String(name)+" "+prettyName(key)+" "+(value&&typeof value==="object"?"a referenced value":String(value));
+  }
   function walk(o,path,heading,depth=0){
-    if(depth>13)return '<p class="warning">Deep structure; see Source view</p>';
-    if(Array.isArray(o))return o.map((v,i)=>walk(v,path.concat(i),heading+" / "+(i+1),depth+1)).join("");
-    if(o&&typeof o==="object")return Object.entries(o).map(([key,v])=>{
-      if(typeof v==="object"&&v!==null)return walk(v,path.concat(key),heading+" / "+key,depth+1);
-      const label=key==="require"?"Existence and match":key==="equals"?"Equals":key==="matches_regex"?"Regular expression":key==="case_insensitive_equals"?"Equals (case-insensitive)":key;
-      return '<div class="stack"><small>'+esc(heading)+'</small>'+field(path.concat(key),label,v,key==="require"?levels:null)+'</div>';
-    }).join("");
-    return '<div class="stack">'+esc(heading)+": "+esc(o)+'</div>';
+    if(depth>32)return '<p class="warning">Deep structure. Use Source to inspect further.</p>';
+    if(Array.isArray(o))return o.map((v,i)=>walk(v,path.concat(i),"Alternative / Item "+(i+1),depth+1)).join("");
+    if(o&&typeof o==="object"){
+      const keys=Object.keys(o), clause=shortClause(o,heading);
+      const groupLabel = heading==="and"?"ALL conditions":heading==="or"?"ANY condition":heading==="record"?"Record":prettyName(heading);
+      const groupSummary=clause||groupLabel;
+      const children=Object.entries(o).map(([key,v])=>{
+        if(v&&typeof v==="object")return walk(v,path.concat(key),key,depth+1);
+        return field(path.concat(key),prettyName(key),v,key==="require"||key==="collected_items_require"||key==="state_fields_require"?levels:key==="states_match"?["all","any","none","one"]:null);
+      }).join("");
+      return '<details class="structure-node" '+(depth<2?"open":"")+'><summary>'+esc(groupSummary)+' <small>('+keys.length+' properties)</small></summary><div class="structure-children">'+children+'</div></details>';
+    }
+    return field(path,prettyName(heading),o,null);
   }
   function testCard(id,t){
-    const path=["assessment","tests",id];
-    let o=t.object;
+    const path=["assessment","tests",id],o=t.object;
     return '<article class="card"><h3>'+esc(t.test_title||id)+'</h3><p><code>'+esc(id)+'</code> · <b>'+esc(t.capability||"unknown")+'</b></p>'+
-      field(path.concat("collected_items_require"),"Items present and matching",t.collected_items_require,levels)+
-      field(path.concat("states_match"),"States match",t.states_match,["all","any","none","one"])+
-      (typeof o==="string"?'<p>Shared Object: <code>'+esc(o)+'</code></p>':walk(o,path.concat("object"),"Object selector"))+
-      '<h4>Expected state fields</h4>'+walk(t.states||[],path.concat("states"),"State")+'</article>';
+      field(path.concat("collected_items_require"),"Collected Items",t.collected_items_require,levels)+
+      field(path.concat("states_match"),"State alternatives",t.states_match,["all","any","none","one"])+
+      (typeof o==="string"?'<p>Shared Object: <code>'+esc(o)+'</code></p>':walk(o,path.concat("object"),"object"))+
+      '<h4>Expected State fields</h4>'+walk(t.states||[],path.concat("states"),"States")+'</article>';
   }
-  function logic(n){
-    if(n==null)return '<span class="leaf">No evaluate block</span>';
-    if(n.test)return '<div class="leaf">TEST: '+esc(n.test)+'</div>';
-    if(n.not)return '<div class="logic"><strong>NOT</strong>'+logic(n.not)+'</div>';
-    if(n.all||n.any){let key=n.all?"all":"any",a=n[key];return '<div class="logic"><strong>'+(key==="all"?"AND — all branches":"OR — any branch")+'</strong>'+a.map(logic).join("")+'</div>'}
-    return '<pre>'+esc(JSON.stringify(n,null,2))+'</pre>';
+  function countTestReferences(n,refs){
+    if(!n||typeof n!=="object")return;
+    if(typeof n.test==="string"){refs[n.test]=(refs[n.test]||0)+1;return}
+    for(const k of ["all","any"]){if(Array.isArray(n[k]))n[k].forEach(x=>countTestReferences(x,refs))}
+    if(n.not)countTestReferences(n.not,refs);
+  }
+  function logic(n,a,refs,depth=0){
+    a=a||doc()?.tree.assessment||{};
+    refs=refs||(()=>{const counts={};countTestReferences(a.evaluate,counts);return counts})();
+    if(!n)return '<p class="warning">No evaluation expression is defined.</p>';
+    if(typeof n.test==="string"){
+      const t=a.tests?.[n.test], exists=!!t;
+      return '<button class="logic-leaf '+(selectedTest===n.test?"active":"")+'" data-select-test="'+esc(n.test)+'" '+(!exists?'disabled title="Referenced Test not loaded"':"")+'><span class="logic-leaf-title">'+esc(t?.test_title||n.test)+'</span><small>'+esc(n.test)+(refs[n.test]>1?' · reused in '+refs[n.test]+' branches':"")+(!exists?" · unresolved":"")+'</small></button>';
+    }
+    if(n.not)return '<details class="logic-group" open><summary>NOT — reverse the following condition</summary><div class="logic-children">'+logic(n.not,a,refs,depth+1)+'</div></details>';
+    if(Array.isArray(n.all)||Array.isArray(n.any)){
+      const op=Array.isArray(n.all)?"all":"any",list=n[op];
+      return '<details class="logic-group" '+(depth<2?"open":"")+'><summary><strong>'+(op==="all"?"AND":"OR")+'</strong> — '+(op==="all"?"every condition must be true":"any condition may be true")+' <small>('+list.length+')</small></summary><div class="logic-children">'+list.map(x=>logic(x,a,refs,depth+1)).join("")+'</div></details>';
+    }
+    return '<div class="warning">Other evaluation construct — inspect Source: <code>'+esc(JSON.stringify(n))+'</code></div>';
+  }
+  function findRefs(node,key,found){
+    found=found||new Set();
+    if(!node||typeof node!=="object")return found;
+    if(Array.isArray(node)){node.forEach(x=>findRefs(x,key,found));return found}
+    for(const [k,v] of Object.entries(node)){
+      if(k===key&&typeof v==="string")found.add(v);
+      if(v&&typeof v==="object")findRefs(v,key,found);
+    }
+    return found;
+  }
+  function variableTrace(a,t){
+    if(!a.variables)return "";
+    const pending=[...findRefs(t,"variable")],seen=new Set();
+    while(pending.length){
+      const id=pending.pop();if(seen.has(id))continue;seen.add(id);
+      const v=a.variables[id];if(v)for(const x of findRefs(v,"variable"))if(!seen.has(x))pending.push(x);
+    }
+    if(!seen.size)return "";
+    return '<details class="dependency-group"><summary>Variable dependencies ('+seen.size+')</summary><div class="structure-children">'+[...seen].map(id=>{
+      const v=a.variables[id];return '<details class="structure-node"><summary>'+esc(v?.title||id)+'</summary><p><code>'+esc(id)+'</code></p>'+(v?walk(v.expression,["assessment","variables",id,"expression"],"expression"):'<p class="warning">Definition not loaded</p>')+'</details>';
+    }).join("")+'</div></details>';
+  }
+  function inspector(a,id,refs){
+    const t=a.tests?.[id];
+    if(!t)return '<section class="card" id="test-inspector"><h3>Select a Test</h3><p>Choose a leaf in the logic tree to inspect its collection and expectations.</p></section>';
+    const path=["assessment","tests",id],o=t.object;
+    const shared=typeof o==="string"?a.shared_objects?.[o]:null;
+    let states=t.states||[];
+    return '<section class="card test-inspector" id="test-inspector"><div class="inspector-eyebrow">FOCUSED TEST · '+esc(id)+'</div><h3>'+esc(t.test_title||id)+'</h3>'+
+      '<p class="help">Read the exact source structure below. These are authored requirements, not scanner results.</p>'+
+      (refs[id]>1?'<p class="reference-note">Shared Test: '+refs[id]+' references in the logic tree; edits affect this one definition.</p>':"")+
+      '<div class="unimplemented-actions"><button type="button" disabled title="Requires source-preserving structural editing">+ Add State or field</button><button type="button" disabled title="Requires dependency-safe unlink/delete">Remove / unlink</button><span>Structural editing is planned; use Source for now.</span></div>'+
+      '<div class="summary-line"><strong>Collected Items:</strong> '+esc(requirementDescription(t.collected_items_require))+'</div>'+
+      (t.states_match?'<div class="summary-line"><strong>State alternatives:</strong> '+esc(t.states_match==="any"?"ANY of the States":t.states_match==="all"?"ALL of the States":t.states_match.replaceAll("_"," "))+'</div>':"")+
+      (t.state_fields_require?'<div class="summary-line"><strong>State fields:</strong> '+esc(requirementDescription(t.state_fields_require))+'</div>':"")+
+      '<details class="inspector-section" open><summary>1. Collection / Object '+(typeof o==="string"?"(shared definition)":"(local definition)")+'</summary><div class="structure-children">'+
+      (typeof o==="string"?'<p class="reference-note">References the shared Object <code>'+esc(o)+'</code>. This is not an additional AND condition.</p>'+(shared?walk(shared,["assessment","shared_objects",o],"object"): '<p class="warning">Shared Object definition not found in this Assessment.</p>'):walk(o,path.concat("object"),"object"))+
+      '</div></details>'+
+      '<details class="inspector-section" open><summary>2. Expected States ('+states.length+')</summary><div class="structure-children">'+
+      walk(states,path.concat("states"),"States")+'</div></details>'+
+      '<details class="inspector-section"><summary>3. Exact Test options</summary><div class="structure-children">'+
+      field(path.concat("collected_items_require"),"Collected Item requirement",t.collected_items_require,levels)+
+      field(path.concat("states_match"),"Combine States",t.states_match,["all","any","none","one"])+
+      field(path.concat("state_fields_require"),"Field requirement",t.state_fields_require,levels)+
+      field(path.concat("reported_elements"),"Reported elements",t.reported_elements)+
+      '</div></details>'+variableTrace(a,t)+
+      '</section>';
   }
   function overview(){
-    const a=doc().tree.assessment;
-    return '<section class="card"><h3>Assessment logic · '+esc(a.id)+'</h3><p>'+esc(a.assessment_title)+'</p><p class="help">Selected source profile: '+esc(a.specification?.version||"unspecified")+' · Pre-alpha research; no schema validator or scanner connected</p></section>'+
-      '<div class="grid">'+Object.entries(a.tests||{}).map(([id,t])=>testCard(id,t)).join("")+'</div>'+
-      '<section class="card"><h3>Test combination</h3><p>Logical structure only. No pass/fail calculation.</p>'+logic(a.evaluate)+'</section>';
+    const a=doc().tree.assessment,refs={};countTestReferences(a.evaluate,refs);
+    if(!selectedTest||!a.tests?.[selectedTest])selectedTest=Object.keys(refs).find(k=>a.tests?.[k])||Object.keys(a.tests||{})[0]||null;
+    const unreferenced=Object.keys(a.tests||{}).filter(k=>!refs[k]);
+    return '<section class="card"><h3>Assessment logic · '+esc(a.id)+'</h3><p>'+esc(a.assessment_title)+'</p><p class="help">Pinned source version '+esc(a.specification?.version||"unspecified")+' · Explanation of authored logic only · NOT SCANNER-VERIFIED</p></section>'+
+      '<div class="graph-layout"><section class="card logic-pane"><h3>1 · How do the Tests combine?</h3><p class="help">Expand a branch. Select any Test to inspect it alongside the tree.</p>'+
+      logic(a.evaluate,a,refs)+
+      (unreferenced.length?'<details class="dependency-group"><summary>Unreferenced Test definitions ('+unreferenced.length+')</summary><div class="structure-children">'+unreferenced.map(id=>'<button class="logic-leaf" data-select-test="'+esc(id)+'">'+esc(a.tests[id].test_title||id)+'</button>').join("")+'</div></details>':"")+
+      '</section>'+inspector(a,selectedTest,refs)+'</div>'+
+      '<section class="card"><h3>Future sample evaluation — placement only</h3><p class="help">The future tested SCAP-NG interpreter will take supplied Items / field values and source statuses, then explain six-state outcomes for each Test and branch. Evaluation is not connected; no result is inferred here.</p><button class="button" disabled>Enter sample evidence (not connected)</button> <button class="button" disabled>Evaluate with scanner (not connected)</button></section>';
   }
   function wizard(){
     const a=doc().tree.assessment,tests=Object.entries(a.tests||{});
@@ -137,8 +256,7 @@
     return header+content+'<div class="actions">'+(step>0?'<button class="button" id="prev">Previous</button>':'')+(step<4?'<button class="button primary" id="next">Accept current & continue →</button>':'<button class="button primary" id="gotoSource">Review source</button>')+'<button class="button" id="gotoGraph">Graphical view</button></div>';
   }
   function fixtures(){
-    const template=sampleText||JSON.stringify({rule_id:chosen,assessment_id:doc().id,synthetic:true,source_status:"complete",sources:[{object:"example",items:[{id:"synthetic-item-1",fields:{}}]}],expected_result:{value:null,review_status:"unreviewed"}},null,2);
-    return '<section class="card"><h3>Synthetic sample observations</h3><p>Supply typed Items and source status. This demo does <strong>not</strong> compute an Assessment result; expected outcomes are human hypotheses.</p><textarea class="editor" id="sampleText" spellcheck="false">'+esc(template)+'</textarea><div class="actions"><button id="exportSample" class="button primary">Download sample JSON</button></div><p class="warning">NOT SCANNER-VERIFIED — no tested evaluation engine connected.</p></section>';
+    return '<section class="card"><h3>Future sample evidence workbench</h3><p>Planned flow: enter/import typed Items and field values → provide source status → evaluate with the tested SCAP-NG interpreter → inspect the per-Test, per-branch six-state trace.</p><p class="warning">NOT CONNECTED: sample collection/evaluation controls remain disabled until a verified interpreter is integrated.</p><div class="sample-mock"><label>Sample Item / source status</label><textarea disabled rows="3" placeholder="Future typed sample evidence"></textarea><label>Evaluation trace</label><pre>Result unavailable — scanner not connected</pre><button class="button" disabled>Evaluate sample</button></div></section>';
   }
   function rawEditor(){return '<div class="card"><h3>YAML source</h3><p class="help">Original source is preserved until you edit. Structured edits reserialize YAML and may change formatting; export and review diffs carefully.</p><textarea id="rawyaml" class="editor" spellcheck="false">'+esc(doc().source)+'</textarea><div class="actions"><button id="applyYAML" class="button primary">Apply YAML to other views</button><span id="rawStatus" class="help">Source and graphical views synchronized</span></div></div>'}
   function sourceView(){return rawEditor()}
@@ -153,6 +271,7 @@
     $("notice").textContent="Imported source: "+d.origin+" · Draft-only. No authoritative schema verification or scanner evaluation.";
     let html=view==="guided"?wizard():view==="graphical"?overview():view==="source"?sourceView():view==="split"?'<div class="split"><div>'+overview()+'</div>'+rawEditor()+'</div>':fixtures();
     $("content").innerHTML=html;
+    $("content").querySelectorAll("[data-select-test]").forEach(b=>b.onclick=()=>{selectedTest=b.dataset.selectTest;render();if(innerWidth<780)$("test-inspector")?.scrollIntoView({block:"start"})});
     $("content").querySelectorAll("[data-step]").forEach(b=>b.onclick=()=>{step=Number(b.dataset.step);render()});
     $("content").querySelectorAll("[data-field]").forEach(e=>e.onchange=()=>{
       const path=JSON.parse(decodeURIComponent(e.dataset.field));
@@ -187,7 +306,7 @@
   $("original").onclick=()=>{const d=doc();if(d&&confirm("Restore this Assessment to its original loaded source?")){const p=parse(d.original);d.source=d.original;d.tree=p.tree;d.changed=false;saveState();render();display("Original restored.")}};
   async function init(){
     if(!window.jsyaml){display("YAML parser asset did not load — app cannot parse files.",true);return}
-    display("Loading two pinned Rule/Assessment examples from public GitHub…");
+    display("Loading six pinned source-backed Rule/Assessment examples from public GitHub…");
     const got=await Promise.all(seeded.map(async ([path])=>{
       try{const url=src+path;const res=await fetch(url,{cache:"force-cache"});if(!res.ok)throw Error("HTTP "+res.status);return {name:path.split("/").pop(),text:await res.text(),url}}
       catch(e){return {err:path+": "+e.message}}
