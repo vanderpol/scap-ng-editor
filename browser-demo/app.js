@@ -93,31 +93,37 @@
     if(value===undefined||value===null)return "";
     const enc=encodeURIComponent(JSON.stringify(path));
     const v=String(value);
-    const choice=Array.isArray(opts)?'<select data-field="'+enc+'">'+[...new Set([v,...opts])].map(x=>'<option value="'+esc(x)+'" '+(x===v?"selected":"")+'>'+esc(x.replaceAll("_"," "))+'</option>').join("")+'</select>':'<input type="text" data-field="'+enc+'" value="'+esc(v)+'" aria-label="'+esc(name)+'">';
+    const optionLabel=x=>levels.includes(x)?requirementDescription(x)+" ("+x+")":
+      ["all","any","none","one"].includes(x)?({all:"All conditions",any:"Any condition",none:"No conditions",one:"Exactly one condition"}[x])+" ("+x+")":x.replaceAll("_"," ");
+    const choice=Array.isArray(opts)?'<select data-field="'+enc+'" aria-label="'+esc(name)+'">'+[...new Set([v,...opts])].map(x=>'<option value="'+esc(x)+'" '+(x===v?"selected":"")+'>'+esc(optionLabel(x))+'</option>').join("")+'</select>':'<input type="text" data-field="'+enc+'" value="'+esc(v)+'" aria-label="'+esc(name)+'">';
     return '<div class="property"><label>'+esc(name)+'</label>'+choice+'</div>';
   }
   const prettyName = k => ({
-    collected_items_require:"Which collected Items must match?",
-    state_fields_require:"Which State fields must match?",
-    reported_elements:"Report elements",
-    states_match:"Combine State alternatives",
+    collected_items_require:"What must be true of the collected entries? (collected_items_require)",
+    state_fields_require:"What must be true of the expected fields? (state_fields_require)",
+    reported_elements:"What details should be reported? (reported_elements)",
+    states_match:"How must alternative conditions match? (states_match)",
     case_insensitive_equals:"equals (ignoring case)",
     matches_regex:"matches regular expression",
     greater_than_or_equal:"is at least",
     less_than_or_equal:"is at most",
     greater_than:"is greater than",
     less_than:"is less than",
-    require:"Existence and matching",
-    for_each:"For each collected Item",
-    fields:"Record fields",
-    object:"Collected Object",
-    set:"Object Set",
-    operands:"Set operands",
-    filters:"Collection filters",
-    select:"Selection criteria",
-    collect:"Collection command",
-    expression:"Variable expression",
-    state:"Expected State"
+    require:"How many must exist and match? (require)",
+    for_each:"Repeat this check for each entry (for_each)",
+    fields:"Fields inside this record (fields)",
+    object:"Where the data comes from (Object)",
+    set:"How collections are combined (set)",
+    operands:"Collections to combine (operands)",
+    filters:"Which collected entries are included or excluded? (filters)",
+    select:"Which entries should be selected? (select)",
+    collect:"How the data is collected (collect)",
+    expression:"How this value is calculated (expression)",
+    state:"Condition that must be satisfied (State)",
+    states:"What the collected data must satisfy (States)",
+    and:"All of these must be true (and)",
+    or:"At least one of these must be true (or)",
+    record:"Structured value with named fields (record)"
   })[k]||String(k).replaceAll("_"," ");
   const requirementDescription = k => ({
     at_least_one_exists_and_all_match:"One or more must exist; all must match",
@@ -149,25 +155,25 @@
   }
   function summarizeTest(t){
     const states=t.states||[];
-    if(!states.length)return "No State conditions defined";
+    if(!states.length)return "No expected conditions (States) defined";
     const parts=states.slice(0,2).map(s=>summarizeCondition(s)).filter(Boolean);
-    if(!parts.length)return states.length+" authored States";
+    if(!parts.length)return states.length+" expected conditions (States)";
     const join=t.states_match==="any"?" OR ":t.states_match==="all"?" AND ":" · ";
-    const s=parts.join(join)+(states.length>2?" … +"+(states.length-2)+" States":"");
+    const s=parts.join(join)+(states.length>2?" … +"+(states.length-2)+" other conditions":"");
     return s.length>165?s.slice(0,162)+"…":s;
   }
   function walk(o,path,heading,depth=0){
     if(depth>32)return '<p class="warning">Deep structure. Use Source to inspect further.</p>';
     if(Array.isArray(o)){
-      const name=heading==="filters"?"Filter":heading==="operands"?"Operand":heading==="and"?"Required condition":heading==="or"?"Alternative condition":heading==="states"||heading==="States"?"State":heading==="concat"?"Part":"Item";
+      const name=heading==="filters"?"Filter":heading==="operands"?"Operand":heading==="and"?"Required condition":heading==="or"?"Alternative condition":heading==="states"||heading==="States"?"Condition (State)":heading==="concat"?"Part":"Item";
       return o.map((v,i)=>walk(v,path.concat(i),name+" "+(i+1),depth+1)).join("");
     }
     if(o&&typeof o==="object"){
       const keys=Object.keys(o), clause=shortClause(o,heading);
-      const special=heading==="for_each"?"For each "+String(o.item||"Item")+" from "+String(o.in||"source"):
-        heading==="set"?"Set operation: "+String(o.operator||"unspecified")+" ("+(o.operands?.length||0)+" operands)":
-        heading==="filters"?"Collection filters":null;
-      const groupLabel = heading==="and"?"ALL conditions":heading==="or"?"ANY condition":heading==="record"?"Record":prettyName(heading);
+      const special=heading==="for_each"?"For each "+String(o.item||"Item")+" from "+String(o.in||"source")+" (for_each)":
+        heading==="set"?"Combine collected data (set): "+String(o.operator||"unspecified")+" ("+(o.operands?.length||0)+" sources)":
+        heading==="filters"?"Which collected entries to keep or exclude (filters)":null;
+      const groupLabel = prettyName(heading);
       const groupSummary=special||clause||groupLabel;
       const children=Object.entries(o).map(([key,v])=>{
         if(v&&typeof v==="object")return walk(v,path.concat(key),key,depth+1);
@@ -180,10 +186,10 @@
   function testCard(id,t){
     const path=["assessment","tests",id],o=t.object;
     return '<article class="card"><h3>'+esc(t.test_title||id)+'</h3><p><code>'+esc(id)+'</code> · <b>'+esc(t.capability||"unknown")+'</b></p>'+
-      field(path.concat("collected_items_require"),"Collected Items",t.collected_items_require,levels)+
-      field(path.concat("states_match"),"State alternatives",t.states_match,["all","any","none","one"])+
+      field(path.concat("collected_items_require"),"Which collected entries must match? (collected_items_require)",t.collected_items_require,levels)+
+      field(path.concat("states_match"),"How alternatives combine (states_match)",t.states_match,["all","any","none","one"])+
       (typeof o==="string"?'<p>Shared Object: <code>'+esc(o)+'</code></p>':walk(o,path.concat("object"),"object"))+
-      '<h4>Expected State fields</h4>'+walk(t.states||[],path.concat("states"),"States")+'</article>';
+      '<h4>What the collected data must satisfy (States)</h4>'+walk(t.states||[],path.concat("states"),"States")+'</article>';
   }
   function countTestReferences(n,refs){
     if(!n||typeof n!=="object")return;
@@ -224,7 +230,7 @@
       const v=a.variables[id];if(v)for(const x of findRefs(v,"variable"))if(!seen.has(x))pending.push(x);
     }
     if(!seen.size)return "";
-    return '<details class="dependency-group"><summary>Variable dependencies ('+seen.size+')</summary><div class="structure-children">'+[...seen].map(id=>{
+    return '<details class="dependency-group"><summary>How required values are calculated (Variables: '+seen.size+')</summary><div class="structure-children">'+[...seen].map(id=>{
       const v=a.variables[id];const deps=v?[...findRefs(v.expression,"variable")]:[];return '<details class="structure-node"><summary>'+esc(v?.title||id)+(deps.length?' <small>← depends on '+esc(deps.map(x=>a.variables[x]?.title||x).join(", "))+'</small>':"")+'</summary><p><code>'+esc(id)+'</code></p>'+(v?walk(v.expression,["assessment","variables",id,"expression"],"expression"):'<p class="warning">Definition not loaded</p>')+'</details>';
     }).join("")+'</div></details>';
   }
@@ -250,7 +256,7 @@
       const o=a.shared_objects[id];if(o)appendObjectRefs(o);
     }
     if(!seenObjects.size)return "";
-    return '<details class="dependency-group"><summary>Shared Object / collection dependencies ('+seenObjects.size+')</summary><p class="help">These Objects feed collections. They are not extra AND/OR Tests.</p><div class="structure-children">'+[...seenObjects].map(id=>{
+    return '<details class="dependency-group"><summary>Other data sources this check depends on (shared_objects: '+seenObjects.size+')</summary><p class="help">These Objects feed collections. They are not extra AND/OR Tests.</p><div class="structure-children">'+[...seenObjects].map(id=>{
       const o=a.shared_objects[id];
       return '<details class="structure-node"><summary>'+esc(o?.object_title||id)+' <small>'+esc(id)+'</small></summary>'+
         (o?walk(o,["assessment","shared_objects",id],"object"):'<p class="warning">Definition unavailable</p>')+'</details>';
@@ -266,19 +272,19 @@
       '<p class="help">Read the exact source structure below. These are authored requirements, not scanner results.</p>'+
       (refs[id]>1?'<p class="reference-note">Shared Test: '+refs[id]+' references in the logic tree; edits affect this one definition.</p>':"")+
       '<div class="unimplemented-actions"><button type="button" disabled title="Requires source-preserving structural editing">+ Add State or field</button><button type="button" disabled title="Requires dependency-safe unlink/delete">Remove / unlink</button><span>Structural editing is planned; use Source for now.</span></div>'+
-      '<div class="summary-line"><strong>Collected Items:</strong> '+esc(requirementDescription(t.collected_items_require))+'</div>'+
-      (t.states_match?'<div class="summary-line"><strong>State alternatives:</strong> '+esc(t.states_match==="any"?"ANY of the States":t.states_match==="all"?"ALL of the States":t.states_match.replaceAll("_"," "))+'</div>':"")+
-      (t.state_fields_require?'<div class="summary-line"><strong>State fields:</strong> '+esc(requirementDescription(t.state_fields_require))+'</div>':"")+
-      '<details class="inspector-section" open><summary>1. Collection / Object '+(typeof o==="string"?"(shared definition)":"(local definition)")+'</summary><div class="structure-children">'+
+      '<div class="summary-line"><strong>Which collected entries must match (collected_items_require):</strong> '+esc(requirementDescription(t.collected_items_require))+'</div>'+
+      (t.states_match?'<div class="summary-line"><strong>How the alternatives are combined (states_match):</strong> '+esc(t.states_match==="any"?"ANY of the States":t.states_match==="all"?"ALL of the States":t.states_match.replaceAll("_"," "))+'</div>':"")+
+      (t.state_fields_require?'<div class="summary-line"><strong>Which expected fields must match (state_fields_require):</strong> '+esc(requirementDescription(t.state_fields_require))+'</div>':"")+
+      '<details class="inspector-section" open><summary>1. Where the data comes from (Object) '+(typeof o==="string"?"(shared definition)":"(local definition)")+'</summary><div class="structure-children">'+
       (typeof o==="string"?'<p class="reference-note">References the shared Object <code>'+esc(o)+'</code>. This is not an additional AND condition.</p>'+(shared?walk(shared,["assessment","shared_objects",o],"object"): '<p class="warning">Shared Object definition not found in this Assessment.</p>'):walk(o,path.concat("object"),"object"))+
       '</div></details>'+
-      '<details class="inspector-section" open><summary>2. Expected States ('+states.length+')</summary><div class="structure-children">'+
+      '<details class="inspector-section" open><summary>2. What the collected data must satisfy (States: '+states.length+')</summary><div class="structure-children">'+
       walk(states,path.concat("states"),"States")+'</div></details>'+
-      '<details class="inspector-section"><summary>3. Exact Test options</summary><div class="structure-children">'+
-      field(path.concat("collected_items_require"),"Collected Item requirement",t.collected_items_require,levels)+
-      field(path.concat("states_match"),"Combine States",t.states_match,["all","any","none","one"])+
-      field(path.concat("state_fields_require"),"Field requirement",t.state_fields_require,levels)+
-      field(path.concat("reported_elements"),"Reported elements",t.reported_elements)+
+      '<details class="inspector-section"><summary>3. Detailed requirements (Test options)</summary><div class="structure-children">'+
+      field(path.concat("collected_items_require"),"Which collected entries must match? (collected_items_require)",t.collected_items_require,levels)+
+      field(path.concat("states_match"),"How alternatives combine (states_match)",t.states_match,["all","any","none","one"])+
+      field(path.concat("state_fields_require"),"Which expected fields must match? (state_fields_require)",t.state_fields_require,levels)+
+      field(path.concat("reported_elements"),"What details should be reported? (reported_elements)",t.reported_elements)+
       '</div></details>'+objectTrace(a,t)+variableTrace(a,t)+
       '</section>';
   }
@@ -287,7 +293,7 @@
     if(!selectedTest||!a.tests?.[selectedTest])selectedTest=Object.keys(refs).find(k=>a.tests?.[k])||Object.keys(a.tests||{})[0]||null;
     const unreferenced=Object.keys(a.tests||{}).filter(k=>!refs[k]);
     return '<section class="card"><h3>Assessment logic · '+esc(a.id)+'</h3><p>'+esc(a.assessment_title)+'</p><p class="help">Pinned source version '+esc(a.specification?.version||"unspecified")+' · Explanation of authored logic only · NOT SCANNER-VERIFIED</p></section>'+
-      '<div class="graph-layout"><section class="card logic-pane"><h3>1 · How do the Tests combine?</h3><p class="help">Expand a branch. Select any Test to inspect it alongside the tree.</p>'+
+      '<div class="graph-layout"><section class="card logic-pane"><h3>1 · How the checks work together (evaluate)</h3><p class="help">Expand a branch. Select any Test to inspect it alongside the tree.</p>'+
       logic(a.evaluate,a,refs)+
       (unreferenced.length?'<details class="dependency-group"><summary>Unreferenced Test definitions ('+unreferenced.length+')</summary><div class="structure-children">'+unreferenced.map(id=>'<button class="logic-leaf" data-select-test="'+esc(id)+'">'+esc(a.tests[id].test_title||id)+'</button>').join("")+'</div></details>':"")+
       '</section>'+inspector(a,selectedTest,refs)+'</div>'+
@@ -295,17 +301,17 @@
   }
   function wizard(){
     const a=doc().tree.assessment,tests=Object.entries(a.tests||{});
-    const names=["Purpose","Collection","Conditions","Logic","Samples"];
+    const names=["Purpose","Collect data","What must match","Combine checks","Example data (future)"];
     let header='<div class="steps">'+names.map((n,i)=>'<button data-step="'+i+'" class="'+(step===i?"selected":"")+'">'+(i+1)+". "+n+'</button>').join("")+'</div>';
     let content="";
     if(step===0)content='<section class="card"><h3>1 · Understand this requirement</h3><p>'+esc(a.assessment_title)+'</p><p>Rule: <b>'+esc(chosen)+'</b> · Assessment: '+esc(a.id)+'</p><p class="help">The current source is the starting choice; an AI is not silently changing it.</p></section>';
-    if(step===1)content='<section class="card"><h3>2 · What should be collected?</h3><p>Edit collection and Item matching requirements. Changing a value updates the editable source draft.</p></section>'+
+    if(step===1)content='<section class="card"><h3>2 · What data should we examine? (Object)</h3><p>Edit collection and Item matching requirements. Changing a value updates the editable source draft.</p></section>'+
       tests.map(([id,t])=>'<section class="card"><h3>'+esc(id)+'</h3><p>Capability: '+esc(t.capability)+'</p>'+
-      field(["assessment","tests",id,"collected_items_require"],"Required Items",t.collected_items_require,levels)+
+      field(["assessment","tests",id,"collected_items_require"],"Which collected entries must match? (collected_items_require)",t.collected_items_require,levels)+
       (typeof t.object==="object"?walk(t.object,["assessment","tests",id,"object"],"Object"): '<p>Shared Object: '+esc(t.object)+'</p>')+'</section>').join("");
-    if(step===2)content='<section class="card"><h3>3 · Which fields must match?</h3><p>Existence and matching are separate concerns; every nested record remains visible.</p></section>'+
+    if(step===2)content='<section class="card"><h3>3 · What must be true of the collected data? (States)</h3><p>Existence and matching are separate concerns; every nested record remains visible.</p></section>'+
       tests.map(([id,t])=>'<section class="card"><h3>'+esc(t.test_title||id)+'</h3>'+walk(t.states||[],["assessment","tests",id,"states"],"State")+'</section>').join("");
-    if(step===3)content='<section class="card"><h3>4 · How do Tests combine?</h3><p>Read the exact OR/AND tree. Restructuring expressions is available in Source view; graphical restructuring is not yet implemented.</p>'+logic(a.evaluate)+'</section>';
+    if(step===3)content='<section class="card"><h3>4 · How the checks work together (evaluate)</h3><p>Read the exact OR/AND tree. Restructuring expressions is available in Source view; graphical restructuring is not yet implemented.</p>'+logic(a.evaluate)+'</section>';
     if(step===4)content=fixtures();
     return header+content+'<div class="actions">'+(step>0?'<button class="button" id="prev">Previous</button>':'')+(step<4?'<button class="button primary" id="next">Accept current & continue →</button>':'<button class="button primary" id="gotoSource">Review source</button>')+'<button class="button" id="gotoGraph">Graphical view</button></div>';
   }
