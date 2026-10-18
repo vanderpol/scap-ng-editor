@@ -1,0 +1,17 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "scap-ng-authoring",
+  "version": "0.1.0",
+  "description": "Draft source-grounded SCAP-NG Assessments with human review, version pinning, and prior-art reuse. No scanner or automatic write actions.",
+  "author": {
+    "name": "SCAP-NG project"
+  },
+  "repository": "https://github.com/vanderpol/scap-ng-editor",
+  "keywords": [
+    "SCAP-NG",
+    "security-compliance",
+    "STIG",
+    "OVAL",
+    "assessment-authoring"
+  ]
+}
