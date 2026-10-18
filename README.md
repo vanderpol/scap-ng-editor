@@ -12,6 +12,8 @@ The [first Codex engineering slice is specified in issue #3](https://github.com/
 
 The Joval technical meeting uses this [one-page October 16 agenda](https://github.com/vanderpol/scap-ng/blob/main/research/assessment-simplification/compact-authoring-04/JOVAL-MEETING-2026-10-16.md). No 0.4 research candidate was promoted to a normative schema merely by passing source validation.
 
+**Sample-text evaluation design:** [Reuse the bounded Python result reference and text-to-observation adapters](docs/PYTHON-SAMPLE-TEXT-INTEGRATION.md) for an AI authoring agent and VS Code. Only Linux mountinfo parsing and the pinned /home Test-to-Assessment bridge are currently proven; arbitrary Apache config-text evaluation is research only.
+
 ## AI-first editor research (18 October 2026)
 
 [AI-first authoring agent over a shared validation/test core](docs/AI-FIRST-AUTHORING-AGENT.md) — research [issue #4](https://github.com/vanderpol/scap-ng-editor/issues/4). Investigates conversational Assessment generation, synthetic sample-data tests, independent six-state evaluation and human-reviewed Git patches, sharing the same version-pinned source engine with VS Code or a future graphical workbench. **No agent, editor backend or new compiler has been commissioned or implemented; semantic gate #229 remains open.**
