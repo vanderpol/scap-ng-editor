@@ -65,8 +65,20 @@ try {
   assert(await page.getByText('Combine collected data (set)', { exact: false }).count() >= 1, 'Linux set/foreach structure should be visible');
   await page.locator('[data-id="SV-214228"]').click();
   assert((await page.locator('#test-inspector').innerText()).includes('How required values are calculated (Variables:'), 'Apache variable dependencies should be linked');
+  assert((await page.locator('#test-inspector .shellcommand-panel').innerText()).includes('no fixed command string'), 'Variable-generated Apache command must not be presented as a literal');
+  assert((await page.locator('#test-inspector .shellcommand-panel').innerText()).includes('command from the Variable'), 'Apache command source must be identified');
+  assert.equal(await page.locator('#test-inspector .shellcommand-panel textarea[data-field]').count(), 0, 'Variable-generated command must not be edited as if it were literal');
   await page.locator('[data-id="SV-259345"]').click();
   assert((await page.locator('.logic-group').count()) >= 2, 'DNS has nested alternatives');
+  const dnsCommand=page.locator('#test-inspector .shellcommand-panel textarea[data-field]');
+  assert.equal(await dnsCommand.count(), 1, 'Literal PowerShell command must be immediately visible in Test inspector');
+  assert((await dnsCommand.inputValue()).includes('Get-DnsServerZone'), 'Display exact authored DNS PowerShell command');
+  await dnsCommand.fill('Get-DnsServerZone | Select-Object ZoneName');
+  await dnsCommand.press('Tab');
+  await page.locator('[data-view="source"]').click();
+  const dnsYaml=await page.locator('#rawyaml').inputValue();
+  assert(dnsYaml.includes('Get-DnsServerZone | Select-Object ZoneName'), 'Editing literal command must update corresponding YAML command field');
+  assert(dnsYaml.includes('SV-259345.automated'), 'Editing command must not alter the Assessment identity');
 
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
   mobile.on('pageerror', err => jsErrors.push(err.message));
