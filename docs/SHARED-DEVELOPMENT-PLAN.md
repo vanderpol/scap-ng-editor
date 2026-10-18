@@ -1,7 +1,7 @@
 # Shared Development Plan — SCAP-NG Assessment Editor
 
 **Updated:** 2026-10-15  
-**Status:** planning and foundation work only; **no editor application has been implemented or validated yet**. New commits must cite real GitHub issues.  
+**Status:** A **static pre-alpha browser demonstration** is implemented and published via GitHub Pages (18 Oct); a full source-preserving editor, tested SCAP-NG evaluator, interactive agent backend and offline VS Code extension are **not** implemented/validated. New commits must cite real GitHub issues.  
 **Repository:** `vanderpol/scap-ng-editor` (`main`)  
 **Primary work item:** [Assessment-first MVP #2](https://github.com/vanderpol/scap-ng-editor/issues/2)  
 **Queued Codex first slice:** [Source-preserving document core #3](https://github.com/vanderpol/scap-ng-editor/issues/3) — specification ready, **implementation not started or authorized**.  
@@ -9,6 +9,15 @@
 **Future product decision:** [Full workbench vs. editor entrypoint #1](https://github.com/vanderpol/scap-ng-editor/issues/1)
 
 > **The shared contract for ChatGPT, Codex, and human contributors.** Read this file and root `AGENTS.md` before beginning development. Commit updates to this file alongside meaningful implementation milestones. The **repository** is the communication medium; chat prompts are not the durable project specification. This file is not an autonomous job queue or a signal that a task is running.
+
+## Browser demo delivery — 18 October 2026
+
+- **Public browser URL:** https://vanderpol.github.io/scap-ng-editor/ — GitHub Pages deploy [run #39171951937](https://github.com/vanderpol/scap-ng-editor/actions/runs/39171951937) **success** after owner enabled Pages. The static site was deployed from `browser-demo/`; successful deployment is verified from GitHub's own workflow log, though direct remote page rendering could not be independently opened from this runtime.
+- **Browser interaction smoke:** [run #39171951894](https://github.com/vanderpol/scap-ng-editor/actions/runs/39171951894) **success**: source-pinned RHEL 9 and Windows 11 Rules/Assessments loaded, Windows OR graph visible, graphical scalar edit reflected in source view, guided and sample modes accessible, phone viewport functional and no browser JS errors.
+- Implementation: HTML/CSS/JS client only, MIT-licensed bundled `js-yaml`, official source-pinned **NG research fixtures retrieved from external sample-data repo**, local YAML import/download, prototype Rule search and automation link classification, guided/graphical/source/split/sample panels. No token/AI calls or Python server needed for hosted runtime.
+- **Limitations:** only loaded sample Rules indexed (not the planned comprehensive official XCCDF/SCAP cache); browser-side YAML parsing is **not** schema/reference validation; graphical fields currently edit scalar values and reserialize YAML (could change formatting/comments), not round-trip-source-preserving arbitrary structural edits. User-authored sample observations **are not scanner evaluated**. No hosted AI, GitHub writes, live scanner, or offline VS Code deliverable.
+- **Hosting portability:** `browser-demo/` assets are relative, with source repo/revision configured in `site-config.js`; later transfer to an approved OVAL Community GitHub repo/domain is an infrastructure/ownership decision, not a rewrite. See [browser-demo README](../browser-demo/README.md).
+- GitHub issues: [Board demo #6](https://github.com/vanderpol/scap-ng-editor/issues/6) and [fast UX #8](https://github.com/vanderpol/scap-ng-editor/issues/8). These tests do not release the SCAP-NG #229 semantic gate or establish production scanner equivalence.
 
 **Related sample-text research:** The existing restricted Python mountinfo parser and result reference routines could support pasted configuration examples through a version-pinned test service. General Apache text evaluation and a deployed service remain unimplemented. [Research details](PYTHON-SAMPLE-TEXT-INTEGRATION.md) (issue #4).
 
