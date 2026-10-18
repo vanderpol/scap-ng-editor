@@ -136,13 +136,39 @@
     const value=node[key];
     return String(name)+" "+prettyName(key)+" "+(value&&typeof value==="object"?"a referenced value":String(value));
   }
+  function summarizeCondition(n,depth=0){
+    if(!n||typeof n!=="object"||depth>6)return "";
+    if(Array.isArray(n))return n.slice(0,3).map(x=>summarizeCondition(x,depth+1)).filter(Boolean).join("; ")+(n.length>3?" … +"+(n.length-3)+" more":"");
+    if(Array.isArray(n.and))return "("+n.and.map(x=>summarizeCondition(x,depth+1)).filter(Boolean).join(" AND ")+")";
+    if(Array.isArray(n.or))return "("+n.or.map(x=>summarizeCondition(x,depth+1)).filter(Boolean).join(" OR ")+")";
+    if(n.record?.fields)return "record: "+Object.entries(n.record.fields).map(([k,v])=>k+" "+summarizeCondition(v,depth+1)).join("; ");
+    const comparisons=["equals","case_insensitive_equals","matches_regex","greater_than_or_equal","less_than_or_equal","greater_than","less_than"];
+    const cmp=comparisons.find(k=>Object.hasOwn(n,k));
+    if(cmp)return prettyName(cmp)+" "+String(n[cmp]);
+    return Object.entries(n).filter(([k])=>k!=="require"&&k!=="state_fields_require").slice(0,4).map(([k,v])=>k+" "+summarizeCondition(v,depth+1)).join("; ");
+  }
+  function summarizeTest(t){
+    const states=t.states||[];
+    if(!states.length)return "No State conditions defined";
+    const parts=states.slice(0,2).map(s=>summarizeCondition(s)).filter(Boolean);
+    if(!parts.length)return states.length+" authored States";
+    const join=t.states_match==="any"?" OR ":t.states_match==="all"?" AND ":" · ";
+    const s=parts.join(join)+(states.length>2?" … +"+(states.length-2)+" States":"");
+    return s.length>165?s.slice(0,162)+"…":s;
+  }
   function walk(o,path,heading,depth=0){
     if(depth>32)return '<p class="warning">Deep structure. Use Source to inspect further.</p>';
-    if(Array.isArray(o))return o.map((v,i)=>walk(v,path.concat(i),"Alternative / Item "+(i+1),depth+1)).join("");
+    if(Array.isArray(o)){
+      const name=heading==="filters"?"Filter":heading==="operands"?"Operand":heading==="and"?"Required condition":heading==="or"?"Alternative condition":heading==="states"||heading==="States"?"State":heading==="concat"?"Part":"Item";
+      return o.map((v,i)=>walk(v,path.concat(i),name+" "+(i+1),depth+1)).join("");
+    }
     if(o&&typeof o==="object"){
       const keys=Object.keys(o), clause=shortClause(o,heading);
+      const special=heading==="for_each"?"For each "+String(o.item||"Item")+" from "+String(o.in||"source"):
+        heading==="set"?"Set operation: "+String(o.operator||"unspecified")+" ("+(o.operands?.length||0)+" operands)":
+        heading==="filters"?"Collection filters":null;
       const groupLabel = heading==="and"?"ALL conditions":heading==="or"?"ANY condition":heading==="record"?"Record":prettyName(heading);
-      const groupSummary=clause||groupLabel;
+      const groupSummary=special||clause||groupLabel;
       const children=Object.entries(o).map(([key,v])=>{
         if(v&&typeof v==="object")return walk(v,path.concat(key),key,depth+1);
         return field(path.concat(key),prettyName(key),v,key==="require"||key==="collected_items_require"||key==="state_fields_require"?levels:key==="states_match"?["all","any","none","one"]:null);
@@ -171,7 +197,7 @@
     if(!n)return '<p class="warning">No evaluation expression is defined.</p>';
     if(typeof n.test==="string"){
       const t=a.tests?.[n.test], exists=!!t;
-      return '<button class="logic-leaf '+(selectedTest===n.test?"active":"")+'" data-select-test="'+esc(n.test)+'" '+(!exists?'disabled title="Referenced Test not loaded"':"")+'><span class="logic-leaf-title">'+esc(t?.test_title||n.test)+'</span><small>'+esc(n.test)+(refs[n.test]>1?' · reused in '+refs[n.test]+' branches':"")+(!exists?" · unresolved":"")+'</small></button>';
+      return '<button class="logic-leaf '+(selectedTest===n.test?"active":"")+'" data-select-test="'+esc(n.test)+'" '+(!exists?'disabled title="Referenced Test not loaded"':"")+'><span class="logic-leaf-title">'+esc(t?.test_title||n.test)+'</span><span class="logic-leaf-summary">'+esc(t?summarizeTest(t):"Definition unavailable")+'</span><small>'+esc(n.test)+(refs[n.test]>1?' · reused in '+refs[n.test]+' branches':"")+(!exists?" · unresolved":"")+'</small></button>';
     }
     if(n.not)return '<details class="logic-group" open><summary>NOT — reverse the following condition</summary><div class="logic-children">'+logic(n.not,a,refs,depth+1)+'</div></details>';
     if(Array.isArray(n.all)||Array.isArray(n.any)){
@@ -199,7 +225,7 @@
     }
     if(!seen.size)return "";
     return '<details class="dependency-group"><summary>Variable dependencies ('+seen.size+')</summary><div class="structure-children">'+[...seen].map(id=>{
-      const v=a.variables[id];return '<details class="structure-node"><summary>'+esc(v?.title||id)+'</summary><p><code>'+esc(id)+'</code></p>'+(v?walk(v.expression,["assessment","variables",id,"expression"],"expression"):'<p class="warning">Definition not loaded</p>')+'</details>';
+      const v=a.variables[id];const deps=v?[...findRefs(v.expression,"variable")]:[];return '<details class="structure-node"><summary>'+esc(v?.title||id)+(deps.length?' <small>← depends on '+esc(deps.map(x=>a.variables[x]?.title||x).join(", "))+'</small>':"")+'</summary><p><code>'+esc(id)+'</code></p>'+(v?walk(v.expression,["assessment","variables",id,"expression"],"expression"):'<p class="warning">Definition not loaded</p>')+'</details>';
     }).join("")+'</div></details>';
   }
   function inspector(a,id,refs){
