@@ -28,6 +28,8 @@ See the [versioned, source-backed evaluation-core contract](https://github.com/v
 
 **Board-demo materials:** [version-bound conversational agent charter](BOARD-DEMO-VERSION-BOUND-AGENT-CHARTER.md) and [schema/capability/vocabulary profile contract](AGENT-VERSION-PROFILE-CONTRACT.md). These provide a reusable prompt/reading plan for an existing GitHub-connected chat, **not** a deployed dynamic profile resolver. Tracked in [#6](https://github.com/vanderpol/scap-ng-editor/issues/6).
 
+**Agent release staging (18 October):** [Portable private-test plugin scaffold](../agent-plugin/README.md), [source-backend prior-art modernization contract](ASSESSMENT-PRIOR-ART-REUSE-CONTRACT.md), and [private→public acceptance issue #7](https://github.com/vanderpol/scap-ng-editor/issues/7). The plugin is **source-controlled but not installed**, deployed, scanner-backed or publicly published. Its initial skill is read-only/draft-only and version-bound; source retrieval precedes concise native NG generation.
+
 ## Version-adaptive Board demonstration (18 October 2026)
 
 The owner requires a conversational Assessment agent that selects a specific immutable SCAP-NG version and loads its schemas, capabilities, examples and vocabulary. Changes in ordinary naming should refresh the drafting profile, not demand a new agent; changed semantics and migration of existing Assessments still need separate review and scanner evidence. See [agent version profile](AGENT-VERSION-PROFILE-CONTRACT.md) and [October 22 demo #6](https://github.com/vanderpol/scap-ng-editor/issues/6). The October 15 r3 scoped grammar is a labeled research overlay, not an accepted base schema. This is a documented demo requirement, not proof of a working dynamic loader.
