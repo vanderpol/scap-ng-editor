@@ -150,7 +150,7 @@
     if(n.record?.fields)return "record: "+Object.entries(n.record.fields).map(([k,v])=>k+" "+summarizeCondition(v,depth+1)).join("; ");
     const comparisons=["equals","case_insensitive_equals","matches_regex","greater_than_or_equal","less_than_or_equal","greater_than","less_than"];
     const cmp=comparisons.find(k=>Object.hasOwn(n,k));
-    if(cmp)return prettyName(cmp)+" "+String(n[cmp]);
+    if(cmp)return prettyName(cmp)+" "+String(n[cmp])+(n.require?" ["+requirementDescription(n.require)+" (require)]":"");
     return Object.entries(n).filter(([k])=>k!=="require"&&k!=="state_fields_require").slice(0,4).map(([k,v])=>k+" "+summarizeCondition(v,depth+1)).join("; ");
   }
   function summarizeTest(t){
@@ -160,7 +160,7 @@
     if(!parts.length)return states.length+" expected conditions (States)";
     const join=t.states_match==="any"?" OR ":t.states_match==="all"?" AND ":" · ";
     const s=parts.join(join)+(states.length>2?" … +"+(states.length-2)+" other conditions":"");
-    return s.length>165?s.slice(0,162)+"…":s;
+    return s.length>235?s.slice(0,230)+"… (expand details)":s;
   }
   function walk(o,path,heading,depth=0){
     if(depth>32)return '<p class="warning">Deep structure. Use Source to inspect further.</p>';
