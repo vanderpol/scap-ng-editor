@@ -262,25 +262,86 @@
         (o?walk(o,["assessment","shared_objects",id],"object"):'<p class="warning">Definition unavailable</p>')+'</details>';
     }).join("")+'</div></details>';
   }
+  // Semantic presentation: this is one authored check, not two independent rules.
+  // Every editable control below still addresses its original YAML path.
+  function humanCollection(a,t){
+    const ref=typeof t.object==="string"?t.object:null;
+    const o=ref?a.shared_objects?.[ref]:t.object;
+    const capability=t.capability||o?.capability||"unspecified capability";
+    if(!o||typeof o!=="object")return {text:"Referenced data source "+(ref||"not loaded"),detail:"Unresolved Object reference"};
+    const humanCaps={
+      "linux.partition":"mounted filesystem entries",
+      "unix.file":"filesystem entries",
+      "windows.registry":"Windows Registry entries",
+      "windows.userright":"Windows user-right assignments",
+      "windows.wmi.query":"Windows system information",
+      "independent.shellcommand":"command output"
+    };
+    const source=humanCaps[capability]||capability+" results";
+    if(o.select&&typeof o.select==="object"){
+      const where=Object.entries(o.select).slice(0,3).map(([name,pred])=>shortClause(pred,name)).filter(Boolean);
+      return {text:source+(where.length?" matching "+where.join(" and "):""),detail:ref?"Shared source: "+ref:"Local source"};
+    }
+    if(o.collect?.query)return {text:source+" queried with "+o.collect.query,detail:ref?"Shared source: "+ref:"Local source"};
+    if(o.collect?.command){
+      const cmd=o.collect.command;
+      const title=typeof cmd==="object"&&cmd.variable?a.variables?.[cmd.variable]?.title||cmd.variable:null;
+      return {text:source+" gathered by "+(title?"command built from "+title:typeof cmd==="string"?cmd:"a defined command"),detail:ref?"Shared source: "+ref:"Local source"};
+    }
+    if(o.set)return {text:source+" derived from a "+String(o.set.operator||"specified")+" set of collections; see source dependencies",detail:ref?"Shared source: "+ref:"Local source"};
+    if(o.for_each)return {text:source+" collected for each "+String(o.for_each.item||"item")+" from "+String(o.for_each.in||"the referenced source"),detail:ref?"Shared source: "+ref:"Local source"};
+    return {text:source+(o.object_title?" ("+o.object_title+")":""),detail:ref?"Shared source: "+ref:"Local source"};
+  }
+  function oneFieldEditor(id,t){
+    const states=t.states;
+    if(!Array.isArray(states)||states.length!==1)return "";
+    const one=states[0];
+    if(!one||Array.isArray(one)||typeof one!=="object")return "";
+    const fields=Object.entries(one);
+    if(fields.length!==1)return "";
+    const [name,matcher]=fields[0];
+    if(!matcher||typeof matcher!=="object"||Array.isArray(matcher)||matcher.record||matcher.and||matcher.or)return "";
+    const comparison=["equals","case_insensitive_equals","matches_regex","greater_than_or_equal","less_than_or_equal","greater_than","less_than"]
+      .filter(x=>Object.hasOwn(matcher,x));
+    if(comparison.length!==1||matcher[comparison[0]]===null||typeof matcher[comparison[0]]==="object")return "";
+    const op=comparison[0];
+    const exactPath=["assessment","tests",id,"states",0,name,op];
+    return '<div class="inline-predicate"><div class="help">Edit this matching value without leaving the check</div>'+
+      field(exactPath,name+" "+prettyName(op)+" (States)",matcher[op])+
+      (matcher.require?'<p class="help">Matching requirement for this field (require): '+esc(requirementDescription(matcher.require))+'</p>':"")+
+      '</div>';
+  }
+  function combinedReading(a,id,t){
+    const from=humanCollection(a,t),expectation=summarizeTest(t);
+    const mode=t.states_match==="any"?"At least one alternative must match":t.states_match==="all"?"All alternatives must match":t.states_match==="none"?"No alternative may match":t.states_match==="one"?"Exactly one alternative must match":"State combination shown in details";
+    return '<section class="combined-check" aria-label="Readable test description">'+
+      '<h4>What this check means</h4>'+
+      '<p class="check-sentence"><strong>Look at</strong> '+esc(from.text)+'.</p>'+
+      '<p class="check-sentence"><strong>Require</strong> '+esc(expectation)+'.</p>'+
+      '<p class="check-scope"><strong>Across collected entries:</strong> '+esc(requirementDescription(t.collected_items_require))+
+      (t.states_match?' · <strong>Alternatives:</strong> '+esc(mode):"")+
+      (t.state_fields_require?' · <strong>Across State fields:</strong> '+esc(requirementDescription(t.state_fields_require)):"")+
+      '</p>'+oneFieldEditor(id,t)+
+      '<p class="help">This is a readable projection, not a second source format. Expanded details preserve all authored requirements and collection references.</p>'+
+      '</section>';
+  }
   function inspector(a,id,refs){
     const t=a.tests?.[id];
     if(!t)return '<section class="card" id="test-inspector"><h3>Select a Test</h3><p>Choose a leaf in the logic tree to inspect its collection and expectations.</p></section>';
     const path=["assessment","tests",id],o=t.object;
     const shared=typeof o==="string"?a.shared_objects?.[o]:null;
     let states=t.states||[];
-    return '<section class="card test-inspector" id="test-inspector"><div class="inspector-eyebrow">FOCUSED TEST · '+esc(id)+'</div><h3>'+esc(t.test_title||id)+'</h3>'+
-      '<p class="help">Read the exact source structure below. These are authored requirements, not scanner results.</p>'+
-      (refs[id]>1?'<p class="reference-note">Shared Test: '+refs[id]+' references in the logic tree; edits affect this one definition.</p>':"")+
-      '<div class="unimplemented-actions"><button type="button" disabled title="Requires source-preserving structural editing">+ Add State or field</button><button type="button" disabled title="Requires dependency-safe unlink/delete">Remove / unlink</button><span>Structural editing is planned; use Source for now.</span></div>'+
-      '<div class="summary-line"><strong>Which collected entries must match (collected_items_require):</strong> '+esc(requirementDescription(t.collected_items_require))+'</div>'+
-      (t.states_match?'<div class="summary-line"><strong>How the alternatives are combined (states_match):</strong> '+esc(t.states_match==="any"?"At least one condition must match (any)":t.states_match==="all"?"All conditions must match (all)":t.states_match==="none"?"No conditions may match (none)":t.states_match==="one"?"Exactly one condition must match (one)":t.states_match.replaceAll("_"," "))+'</div>':"")+
-      (t.state_fields_require?'<div class="summary-line"><strong>Which expected fields must match (state_fields_require):</strong> '+esc(requirementDescription(t.state_fields_require))+'</div>':"")+
-      '<details class="inspector-section" open><summary>1. Where the data comes from (Object) '+(typeof o==="string"?"(shared definition)":"(local definition)")+'</summary><div class="structure-children">'+
-      (typeof o==="string"?'<p class="reference-note">References the shared Object <code>'+esc(o)+'</code>. This is not an additional AND condition.</p>'+(shared?walk(shared,["assessment","shared_objects",o],"object"): '<p class="warning">Shared Object definition not found in this Assessment.</p>'):walk(o,path.concat("object"),"object"))+
+    return '<section class="card test-inspector" id="test-inspector"><div class="inspector-eyebrow">FOCUSED CHECK (Test) · '+esc(id)+'</div><h3>'+esc(t.test_title||id)+'</h3>'+
+      (refs[id]>1?'<p class="reference-note">Reused check: '+refs[id]+' references in the logic tree; edits affect one Test definition.</p>':"")+
+      combinedReading(a,id,t)+
+      '<div class="unimplemented-actions"><button type="button" disabled title="Requires source-preserving structural editing">+ Add a condition</button><button type="button" disabled title="Requires dependency-safe unlink/delete">Remove / unlink</button><span>Safe structural changes are planned; source editing remains available.</span></div>'+
+      '<details class="inspector-section"><summary>Show the full collection and matching details (Object + States)</summary><div class="structure-children">'+
+      '<h4>Where the information comes from (Object)</h4>'+
+      (typeof o==="string"?'<p class="reference-note">Uses shared source <code>'+esc(o)+'</code>. Collection dependencies are not additional AND conditions.</p>'+(shared?walk(shared,["assessment","shared_objects",o],"object"):'<p class="warning">Shared source definition was not found.</p>'):walk(o,path.concat("object"),"object"))+
+      '<h4>Conditions applied to the information (States: '+states.length+')</h4>'+
+      walk(states,path.concat("states"),"States")+
       '</div></details>'+
-      '<details class="inspector-section" open><summary>2. What the collected data must satisfy (States: '+states.length+')</summary><div class="structure-children">'+
-      walk(states,path.concat("states"),"States")+'</div></details>'+
-      '<details class="inspector-section"><summary>3. Detailed requirements (Test options)</summary><div class="structure-children">'+
+      '<details class="inspector-section"><summary>Precise matching requirements (advanced)</summary><div class="structure-children">'+
       field(path.concat("collected_items_require"),"Which collected entries must match? (collected_items_require)",t.collected_items_require,levels)+
       field(path.concat("states_match"),"How alternatives combine (states_match)",t.states_match,["all","any","none","one"])+
       field(path.concat("state_fields_require"),"Which expected fields must match? (state_fields_require)",t.state_fields_require,levels)+
