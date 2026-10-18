@@ -2,6 +2,10 @@
 
 **18 October 2026 · Owner requirement · [#5](https://github.com/vanderpol/scap-ng-editor/issues/5), alongside [#1](https://github.com/vanderpol/scap-ng-editor/issues/1), [#2](https://github.com/vanderpol/scap-ng-editor/issues/2), [#4](https://github.com/vanderpol/scap-ng-editor/issues/4).** This is an **architecture/research contract, not implementation approval**. An offline-capable VS Code extension is a required client even if an AI-first ChatGPT agent or standalone workbench becomes the primary online interface.
 
+## Optional AI choice, not a dependency
+
+Any optional AI adapter must be user-selected and model-neutral. Offline deployments may use no AI or an approved local/on-prem provider, while connected clients may select from VS Code models and compatible external providers. A hosted SCAP-NG agent is another *optional future* endpoint. Do not force OpenAI/ChatGPT/Copilot or auto-enable cloud traffic. [Detailed provider-neutral contract](MODEL-NEUTRAL-AI-INTEGRATION.md) ([#4](https://github.com/vanderpol/scap-ng-editor/issues/4), [#5](https://github.com/vanderpol/scap-ng-editor/issues/5)).
+
 ## Non-negotiable: offline authoring is fully usable without AI
 
 The offline extension must support local source import, inspection, Assessment drafting from available reviewed patterns, source-preserving edits, completion, reference navigation, **locally packaged schemas**, diagnostic validation, synthetic sample data, reproducible fixtures, diffs, and local save/export. It shall function without logging into ChatGPT, OpenAI API, GitHub, Marketplace, or an activation/telemetry service. It must not depend on downloading JavaScript, CSS, fonts, schema or binaries after installation.
