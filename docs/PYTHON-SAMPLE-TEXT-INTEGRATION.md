@@ -10,6 +10,12 @@ The existing Python truth-table helpers, `parse_mountinfo_text`, restricted nosu
 
 **This decision supersedes the earlier “Python sandbox evaluator service as the initial result backend” recommendation below.** The desired service should ultimately route authoritative requests to the tested scanner; it may use Python parser/reference work internally as test development scaffolding, but must not make provisional reference predictions look like scanner results.
 
+## Evaluation-only scanner mode for the editor (owner refinement, 18 October)
+
+The owner identified a more efficient separation: the editor supplies typed sample values/Items, while **the real scanner's tested evaluation core** evaluates them, with *no native OS collectors required by the editor*. This follows the design precedent of OVAL 5.12.3 `independent:variable_test`, which compares supplied variable values against State criteria; it does not mean every Assessment can be rewritten as a variable test.
+
+See the [versioned, source-backed evaluation-core contract](https://github.com/vanderpol/scap-ng/blob/main/research/assessment-simplification/english-first-04/SCANNER-EVALUATION-CORE-FOR-EDITOR.md) and [SCAP-NG #241](https://github.com/vanderpol/scap-ng/issues/241). The **same tested scanner evaluator** must be callable from real scanner and synthetic fixture paths, preserving scope/Item flags, comparisons, records, field existence, Variable, Set/Filter/foreach and six-state Test/Assessment logic. Human-provided samples bypass actual collection *only*. The existing Python reference models are testing inputs/oracles, **not** yet this qualified shared scanner kernel. Result UI shall explicitly say “scanner-verified on supplied evidence” only after that evaluator meets the conformance gate for the specific capability; never claim a live host was checked. The AI remains authoring-only, and this is **research, not an implementation assignment**.
+
 ## Product recommendation
 
 **Yes: adopt a pluggable local Python *sandbox evaluator service* as the initial reference-testing backend for the AI agent and VS Code/graphical workbench, behind a versioned API.** It is small enough to validate while the authoring grammar evolves, yet teaches the UI the difference between *sample text*, *collected Items*, *state/field matching* and *Assessment truth*.
