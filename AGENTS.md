@@ -1,5 +1,13 @@
 # SCAP-NG Editor development invariants
 
+## Owner requirement: provider-neutral optional AI (2026-10-18)
+
+- No SCAP-NG editor client SHALL require a ChatGPT/OpenAI, GitHub Copilot, Claude, Gemini, Grok or any other AI provider to author/validate native content.
+- For optional AI-assisted generation, expose configurable provider/model selection with support for VS Code's available model-provider API, compatible cloud endpoints, and approved local/air-gapped models. If a user switches providers, source/schema/scanner semantics and file format SHALL remain unchanged.
+- A public hosted SCAP-NG authoring agent may eventually be an optional **open-protocol** endpoint; it is not an existing mandatory service, and the tool contracts must support local/self-hosted deployment.
+- No provider may calculate authoritative Assessment results or bypass human approval. All SCAP-NG tools stay model-neutral, permission-scoped and deterministic where validation/evaluation is concerned.
+- Documented in [model-neutral integration contract](docs/MODEL-NEUTRAL-AI-INTEGRATION.md) and [issues #4/#5](https://github.com/vanderpol/scap-ng-editor/issues/4).
+
 ## Owner requirement: air-gapped VS Code extension must function without Internet (2026-10-18)
 
 - The SCAP-NG product SHALL offer a **fully offline-capable VS Code extension** for disconnected networks alongside any cloud agent and graphical application. Offline authoring is a core product requirement, not a reduced online-agent shell.
