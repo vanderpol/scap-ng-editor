@@ -18,6 +18,10 @@ The Joval technical meeting uses this [one-page October 16 agenda](https://githu
 
 [AI-first authoring agent over a shared validation/test core](docs/AI-FIRST-AUTHORING-AGENT.md) — research [issue #4](https://github.com/vanderpol/scap-ng-editor/issues/4). Investigates conversational Assessment generation, synthetic sample-data tests, independent six-state evaluation and human-reviewed Git patches, sharing the same version-pinned source engine with VS Code or a future graphical workbench. **No agent, editor backend or new compiler has been commissioned or implemented; semantic gate #229 remains open.**
 
+## Configurable AI providers — no vendor lock-in
+
+**[Model-neutral AI design](docs/MODEL-NEUTRAL-AI-INTEGRATION.md):** optional, user-selected Claude/Gemini/Grok/OpenAI/compatible endpoints, approved on-prem/local inference, or a future public/self-hosted SCAP-NG agent. **No AI at all** remains a fully supported mode. Scanner results are produced only by the tested SCAP-NG evaluation core, never by a selected model. Tracked in [#4](https://github.com/vanderpol/scap-ng-editor/issues/4) and [#5](https://github.com/vanderpol/scap-ng-editor/issues/5).
+
 ## Offline-network VS Code editor requirement
 
 **[Air-gapped VS Code extension contract](docs/OFFLINE-VSCODE-EDITOR-CONTRACT.md)** ([issue #5](https://github.com/vanderpol/scap-ng-editor/issues/5)). Users on disconnected networks must be able to install from a locally supplied VSIX and author/validate/review SCAP-NG Assessments using offline schema/content packs, without GitHub, ChatGPT or another hosted AI. Local AI is optional; sample Assessment **results**, when available, come from a tested local scanner evaluation kernel and never from AI. The current editor remains research/planning only.
