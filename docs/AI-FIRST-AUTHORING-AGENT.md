@@ -78,6 +78,12 @@ A **ChatGPT conversation** may follow the same workflow manually without these t
 - **No false confidence:** Human-proofed does not equal semantics-proofed. AI generation may be good at common requirements and dangerously plausible for rare six-state combinations, correlated records, foreach, Set filters, command failure and organizational-input provenance. Show precise warnings and independent evidence status per Test.
 - **Reproducibility:** Pin model/prompt version for research provenance where possible; deterministic saved artifact truth depends on source snapshot, versioned validator and fixtures, **not rerunning an LLM**. Retain original author-reviewed content and reviewer identity in Git.
 
+## Python reference engine behind pasted configuration text
+
+The owner proposes reusing existing Python OVAL result-table and narrowly proven Assessment pilots to evaluate **pasted sample configuration text**, rather than asking the AI to guess whether a source file complies. The [Python sample-text adapter design](PYTHON-SAMPLE-TEXT-INTEGRATION.md) distinguishes (a) direct typed observations, (b) known text-to-Item adapters like the **already working** `/proc/self/mountinfo` parser and `/home nosuid` Test bridge, and (c) future virtual Apache file trees/simulated shell outputs. Apache's actual source depends on two distinct config discovery paths and shell command output—not just visible directive lines—so a paste-only linter must **not** claim source SCAP-NG Test truth until collection equivalence is established.
+
+The recommended first test backend is a **restricted, version-pinned Python service** usable from both the conversational agent and VS Code. It returns six-state traces or explicit `UNSUPPORTED`; the agent explains results but cannot replace the deterministic Test oracle or independently authored expected outcomes. This extends #4 and SCAP-NG #241 **as research only**, not a new compiler implementation task.
+
 ## Best bounded proof before engineering a whole agent
 
 Run three *manual ChatGPT-assisted* creation/review exercises with repo-linked source, and record how often the AI makes semantic errors (not just readable prose):
