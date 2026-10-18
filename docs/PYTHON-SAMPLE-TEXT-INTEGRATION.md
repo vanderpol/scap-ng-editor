@@ -2,6 +2,14 @@
 
 **18 October 2026 · Research [#4](https://github.com/vanderpol/scap-ng-editor/issues/4), [sample-data #241](https://github.com/vanderpol/scap-ng/issues/241).** Owner suggests reusing the existing Python OVAL result/reference code inside an AI-first editor to test arbitrary user-supplied **sample configuration text**. This document distinguishes what is **already demonstrated** from what would require new, source-validated adapters. **Not an implementation authorization, compiler assignment, scanner, or normative 0.4 semantic change.**
 
+## Owner decision — Python reference is NOT the authoritative Assessment-result backend
+
+**Updated 18 October 2026.** The AI may generate content and sample data, but SHALL NOT supply any claim of Assessment validity or an Assessment outcome. A **tested SCAP-NG scanner** must produce authoritative result states for both sample and real evidence. Deterministic schema validation remains a distinct diagnostic task.
+
+The existing Python truth-table helpers, `parse_mountinfo_text`, restricted nosuid Test bridge and WMI source fixtures can be **reused as reference/oracle development aids and text-to-evidence adapters** while building that scanner. They are **not yet a tested general scanner**. Any result values cited below are **bounded research outcomes**, not an editor-backed verified Assessment result. A sample-data authoring pane can accept pasted text and save expectations now, but should display **NOT SCANNER-VERIFIED** until supported scanner execution is actually available and identified by engine/version/evidence hash.
+
+**This decision supersedes the earlier “Python sandbox evaluator service as the initial result backend” recommendation below.** The desired service should ultimately route authoritative requests to the tested scanner; it may use Python parser/reference work internally as test development scaffolding, but must not make provisional reference predictions look like scanner results.
+
 ## Product recommendation
 
 **Yes: adopt a pluggable local Python *sandbox evaluator service* as the initial reference-testing backend for the AI agent and VS Code/graphical workbench, behind a versioned API.** It is small enough to validate while the authoring grammar evolves, yet teaches the UI the difference between *sample text*, *collected Items*, *state/field matching* and *Assessment truth*.
