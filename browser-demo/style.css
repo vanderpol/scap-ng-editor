@@ -51,3 +51,8 @@
 .inline-predicate .property{display:grid;grid-template-columns:1fr;gap:5px}
 .inline-predicate label{font-weight:600}
 .test-inspector .inspector-section h4{font-size:12px;margin:14px 0 8px;color:#3a5771}
+
+/* Source-population cardinality: distinguish how many are found from how many match. */
+.check-scope .result-requirement{margin-top:6px}
+.check-scope .result-requirement span{font-weight:650;color:#284967}
+.check-scope>small{display:block;color:#61758a;margin-top:9px;line-height:1.5}
