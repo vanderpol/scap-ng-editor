@@ -1,21 +1,22 @@
 # SCAP-NG browser demo (pre-alpha)
 
-**October 18, 2026 · [Board-demo #6](https://github.com/vanderpol/scap-ng-editor/issues/6), [fast editor #8](https://github.com/vanderpol/scap-ng-editor/issues/8).** This is a browser-only, **desktop-first** demonstration: no ChatGPT Work, AI generation, server login, host scanner, or Python installation needed for the deployed site.
+**October 18, 2026 · [Complexity audit and hierarchy-first iteration](../docs/EDITOR-COMPLEXITY-AUDIT-2026-10-18.md) · [Board-demo #6](https://github.com/vanderpol/scap-ng-editor/issues/6), [fast editor #8](https://github.com/vanderpol/scap-ng-editor/issues/8).** This is a browser-only, **desktop-first** demonstration: no ChatGPT Work, AI generation, server login, host scanner, or Python installation needed for the deployed site.
 
 ## How to use
 
 - Load the hosted page using Chrome on a Chromebook, desktop browser, or mobile browser (phone layout is simplified).
-- Two real source-backed Rule/Assessment pairs are fetched from the *immutable* pinned `vanderpol/scap-ng-editor-sample-data` repository. They are **pre-alpha r3 research examples** (not the current official DISA publication and not a normative 0.4 schema). This initial browser demo is **not** the full verified DISA XCCDF/SCAP source cache.
-- Filter or search loaded Rules. Select a Rule; switch **Guided**, **Graphical**, **Source**, **Split**, **Sample data**. Change existing scalar values and enum fields in guided/graphical mode, or edit the full YAML in Source mode and press **Apply YAML** to update the views.
+- Six real source-backed Rule/Assessment pairs are fetched from the *immutable* pinned `vanderpol/scap-ng-editor-sample-data` repository. They are **pre-alpha r3 research examples** (not the current official DISA publication and not a normative 0.4 schema). This initial browser demo is **not** the full verified DISA XCCDF/SCAP source cache.
+- Filter or search the six loaded Rules. **Graphical opens by default:** follow the actual nested AND/OR Test tree, select any Test, read its concise State summary and drill into the collected Object, exact State requirements, reused Test/Shared Object references, Set/foreach and Variable dependencies. Switch **Guided**, **Source**, **Split**, **Sample data** when needed. Current structured editing supports existing scalar/enum values but not safe structural graph changes; Source editing remains available.
 - **Export YAML** downloads the current draft. **Restore original** discards changes to the current Assessment. **Import YAML** supports further Rule/Assessment files from your device; corresponding Assessment IDs must match Rule references for auto-linking.
 - Draft edits are stored in **the local browser storage for that origin**, not on GitHub or an AI service. The app performs no GitHub writes. The user remains responsible for exporting a reviewed copy.
-- The synthetic sample panel only collects suggested Item/field evidence. **No authoritative assessment outcome is calculated**; a tested scanner evaluation-only kernel still has to be integrated.
+- The **Sample data tab is now a deliberately disabled mock** showing where typed Items, source status and a future interpreter trace will go. Input/evaluate controls do not run until the editor is integrated with a tested SCAP-NG scanner evaluation kernel.
 
 ## Verified limitations
 
-- Graphical editing changes scalar values and supported finite fields, **not arbitrary Test/State graph restructuring**; use Source mode for structural changes.
+- The logic tree and nested Test inspector are navigable, but **Add/Remove/Unlink are still disabled plans**; changing graph structure safely requires the source-preserving AST plus reference/semantic validation. Source mode remains the expert route.
 - **Graphical edits currently reserialize YAML** with `js-yaml` and may change formatting or comments. Unedited source text is preserved. Always inspect the exported diff before applying it to a maintained source repository. A source-preserving document model remains a core product requirement but is not implemented in this static demo.
 - Browser-side `js-yaml` only performs YAML parsing. **There is no version-aware deterministic JSON Schema/reference validator** in this build, and no scanner-backed Test/Assessment evaluation. No generated AI Assessment has been validated by this demo.
+- The demo now loads six source-backed complexity fixtures, from Linux nosuid and Windows registry alternatives to nested record/user-right logic, RHEL foreach/Set/filters, Windows DNS Variable chains and Apache dependencies. **Complex dataflow is still hard to understand**, especially Apache; see the [six-case usability audit](../docs/EDITOR-COMPLEXITY-AUDIT-2026-10-18.md).
 - The catalog indexes **only loaded Rules**. “Not automated in loaded content” does not mean impossible to automate. Automation candidate marking is a reviewer's proposal only.
 - Initial examples load from `raw.githubusercontent.com`. If a restricted/proxied network blocks that host, use the **Import YAML** control and files exported from `vanderpol/scap-ng-editor-sample-data`; it will report a cache-load warning rather than silently fetching unauthoritative content.
 - Editing/reviews are best on a Chromebook or desktop. Phones work for browsing and minor changes but are not the primary UI.
