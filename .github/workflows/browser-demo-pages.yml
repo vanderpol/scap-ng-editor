@@ -1,0 +1,49 @@
+name: SCAP-NG browser demo
+on:
+  push:
+    branches: [main]
+    paths:
+      - "browser-demo/**"
+      - ".github/workflows/browser-demo-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: browser-demo-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Check and deploy static browser demo
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check static assets and JavaScript syntax
+        run: |
+          test -s browser-demo/index.html
+          test -s browser-demo/style.css
+          test -s browser-demo/app.js
+          test -s browser-demo/vendor/js-yaml.min.js
+          node --check browser-demo/app.js
+          node --check browser-demo/vendor/js-yaml.min.js
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("browser-demo/index.html").read_text()
+          for ref in ('./app.js', './style.css', './vendor/js-yaml.min.js'):
+              assert ref in p, f"Missing static asset reference: {ref}"
+          print("Browser demo assets and syntax verified")
+          PY
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: browser-demo
+      - name: Deploy to Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
