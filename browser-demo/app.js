@@ -3,8 +3,9 @@
 (function(){
   const $=id=>document.getElementById(id);
   const esc=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-  const snap="99cbceae8d594c44cb509df95975ac1676a2b44a";
-  const src="https://raw.githubusercontent.com/vanderpol/scap-ng-editor-sample-data/"+snap+"/focused-fixtures/source-backed/authoring/";
+  const settings=window.SCAPNG_DEMO_SOURCE||{repository:"vanderpol/scap-ng-editor-sample-data",revision:"99cbceae8d594c44cb509df95975ac1676a2b44a",sourcePath:"focused-fixtures/source-backed/authoring/"};
+  const snap=settings.revision;
+  const src="https://raw.githubusercontent.com/"+settings.repository+"/"+snap+"/"+settings.sourcePath;
   const seeded=[
     ["rhel_9/rules/SV-257851.rule.yaml","rule"],
     ["shared/assessments/linux/other/home-mounted-nosuid-option.assessment.yaml","assessment"],
