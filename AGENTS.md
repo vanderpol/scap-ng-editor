@@ -1,5 +1,14 @@
 # SCAP-NG Editor development invariants
 
+## Owner requirement: air-gapped VS Code extension must function without Internet (2026-10-18)
+
+- The SCAP-NG product SHALL offer a **fully offline-capable VS Code extension** for disconnected networks alongside any cloud agent and graphical application. Offline authoring is a core product requirement, not a reduced online-agent shell.
+- With network unavailable and **no AI model or GitHub account**, a provisioned VS Code + local VSIX + compatible offline SCAP-NG schema/capability/reference pack must support source-preserving Assessment editing, guided forms/completion, versioned schema/ref diagnostics, reviewable diffs, local save/patch export and creation of sample-data fixtures.
+- The optional local AI backend may propose drafts, but **must not** be required to use the editor. Cloud ChatGPT/marketplace/GitHub/model/telemetry or remote asset requests SHALL NOT be a startup, run or authoring dependency. Use opt-in cloud transport and explicitly approved sync.
+- **Only the tested scanner's compatible local evaluation kernel** may return authoritative Assessment outcomes for sample data. Until available, show **NOT SCANNER-VERIFIED**, not a Python reference/LLM-generated answer. The editor itself needs no OS data collectors for author-supplied evidence.
+- Supply packaged, pinned, verifiable offline schema/data packs and runtime dependencies by controlled distribution; fail closed on unavailable/incompatible resources instead of silently downloading or assuming defaults.
+- Track user decision and acceptance tests in [issue #5](https://github.com/vanderpol/scap-ng-editor/issues/5) and [offline VS Code contract](docs/OFFLINE-VSCODE-EDITOR-CONTRACT.md). This requirement does not authorize code implementation or unlock the 0.4 semantic gate.
+
 ## Owner decision: AI is authoring assistant, never assessment authority (2026-10-18)
 
 - AI MAY propose Assessments, prose explanations, sample inputs and expected-case ideas. It SHALL NOT declare generated content semantically valid, correct, compliant, passing or OVAL-equivalent.
