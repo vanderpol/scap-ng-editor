@@ -279,8 +279,10 @@
     };
     const source=humanCaps[capability]||capability+" results";
     if(o.select&&typeof o.select==="object"){
-      const where=Object.entries(o.select).slice(0,3).map(([name,pred])=>shortClause(pred,name)).filter(Boolean);
-      return {text:source+(where.length?" matching "+where.join(" and "):""),detail:ref?"Shared source: "+ref:"Local source"};
+      const selectors=Object.entries(o.select);
+      const where=selectors.slice(0,3).map(([name,pred])=>shortClause(pred,name)).filter(Boolean);
+      const more=selectors.length>3?" and "+(selectors.length-3)+" additional selection criteria (expand details)":"";
+      return {text:source+(where.length?" matching "+where.join(" and "):"")+more,detail:ref?"Shared source: "+ref:"Local source"};
     }
     if(o.collect?.query)return {text:source+" queried with "+o.collect.query,detail:ref?"Shared source: "+ref:"Local source"};
     if(o.collect?.command){
