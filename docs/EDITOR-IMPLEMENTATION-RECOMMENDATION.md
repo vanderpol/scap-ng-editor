@@ -2,6 +2,10 @@
 
 **October 15, 2026. Status: research recommendation for [issue #1](https://github.com/vanderpol/scap-ng-editor/issues/1), not approved implementation.**
 
+## 18 October owner requirement — air-gapped VS Code extension
+
+The online agent/standalone workbench **does not replace** the VS Code extension for disconnected networks. [Offline extension contract](OFFLINE-VSCODE-EDITOR-CONTRACT.md) and [#5](https://github.com/vanderpol/scap-ng-editor/issues/5) require that an offline local VSIX + pinned schema/capability packs support source editing, constrained completion, local diagnostics, scenario authoring, exact diffs and patch/file export without GitHub or AI. A local tested scanner evaluation kernel may return sample results independently of collection; when unavailable the editor explicitly reports NOT SCANNER-VERIFIED. The exact UI stack remains undecided; this is a hard product capability constraint, not an implementation approval.
+
 ## User-directed refinement — benchmark-centric authoring workbench (October 15, 2026)
 
 The product should lead with **Benchmark → Rules → Assessment generation**, not with source-file editing. This is a stronger use case than the earlier VS Code-first assistive-editor hypothesis. The **preferred end-user experience** is now a **standalone/offline-ready, benchmark-centric graphical workbench with an expert YAML/JSON editor**, supported by one independent document/semantic engine. A VS Code extension remains a useful second client or an inexpensive early proof of the language engine, but should not determine the author's navigation and workflow. This is a design recommendation, **not a stack authorization or permission to begin implementation**.
