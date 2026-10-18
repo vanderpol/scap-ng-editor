@@ -316,7 +316,7 @@
     const mode=t.states_match==="any"?"At least one alternative must match":t.states_match==="all"?"All alternatives must match":t.states_match==="none"?"No alternative may match":t.states_match==="one"?"Exactly one alternative must match":"State combination shown in details";
     return '<section class="combined-check" aria-label="Readable test description">'+
       '<h4>What this check means</h4>'+
-      '<p class="check-sentence"><strong>Look at</strong> '+esc(from.text)+'.</p>'+
+      '<p class="check-sentence"><strong>Look at</strong> '+esc(from.text)+'. <small>'+esc(from.detail)+'</small></p>'+
       '<p class="check-sentence"><strong>Require</strong> '+esc(expectation)+'.</p>'+
       '<p class="check-scope"><strong>Across collected entries:</strong> '+esc(requirementDescription(t.collected_items_require))+
       (t.states_match?' · <strong>Alternatives:</strong> '+esc(mode):"")+
