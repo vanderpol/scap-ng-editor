@@ -21,11 +21,15 @@ try {
   const guestRefs = page.locator('button.logic-leaf[data-select-test="deny-log-on-through-remote-desktop-services-guests-test"]');
   assert.equal(await guestRefs.count(), 2, 'Guests Test must visibly repeat as one referenced definition');
   await guestRefs.first().click();
-  assert((await page.locator('#test-inspector').innerText()).includes('Shared Test: 2 references'), 'shared Test references should be explained');
-  assert((await page.locator('#test-inspector').innerText()).includes('What the collected data must satisfy (States:'), 'plain-English State heading should be visible with the technical term');
-  assert((await page.locator('#test-inspector').innerText()).includes('Where the data comes from (Object)'), 'collection heading should explain its purpose');
+  assert((await page.locator('#test-inspector').innerText()).includes('Reused check: 2 references'), 'shared Test references should be explained');
+  assert((await page.locator('#test-inspector').innerText()).includes('What this check means'), 'plain-English integrated check should be the primary view');
+  assert((await page.locator('#test-inspector').innerText()).includes('Look at'), 'data collection should appear in the same check as expected conditions');
   assert((await page.locator('#test-inspector').innerText()).includes('windows-userright-object'), 'shared Object should be reachable in Test details');
 
+  assert((await page.locator('#test-inspector .combined-check').innerText()).includes('Require'), 'matching conditions must be displayed in the same card as collection');
+  assert((await page.locator('#test-inspector .combined-check').innerText()).includes('Across collected entries:'), 'item cardinality cannot be hidden by the combined summary');
+  await page.locator('#test-inspector .inspector-section').first().locator('summary').click();
+  assert((await page.locator('#test-inspector').innerText()).includes('States:'), 'full nested State structure must remain accessible');
   await page.locator('#test-inspector .inspector-section').last().locator('summary').click();
   const selects = page.locator('#test-inspector .inspector-section').last().locator('select[data-field]');
   assert((await selects.count()) > 0, 'Focused Test editing should offer requirement choices');
@@ -42,6 +46,18 @@ try {
   await page.locator('[data-view="samples"]').click();
   assert(await page.getByText('NOT CONNECTED', { exact: false }).isVisible(), 'sample panel must not imply a scanner');
   assert(await page.locator('.sample-mock button').isDisabled(), 'sample evaluation must remain disabled');
+
+  await page.locator('[data-id="SV-257851"]').click();
+  assert((await page.locator('#test-inspector .combined-check').innerText()).includes('mounted filesystem entries'), 'simple collection should use a human term');
+  assert((await page.locator('#test-inspector .combined-check').innerText()).includes('nosuid'), 'matching value and data source should be visible together');
+  assert.equal(await page.locator('#test-inspector .inline-predicate input[data-field]').count(), 1, 'simple field value should have a direct edit control');
+  const nosuidEdit=page.locator('#test-inspector .inline-predicate input[data-field]');
+  await nosuidEdit.fill('noexec');
+  await nosuidEdit.press('Tab');
+  await page.locator('[data-view="source"]').click();
+  const editedLinux=await page.locator('#rawyaml').inputValue();
+  assert(editedLinux.includes('equals: noexec'), 'semantic editor must update the exact original field path');
+  assert(editedLinux.includes('mount_point:'), 'source collection selector must remain present after a value change');
 
   await page.locator('[data-id="SV-257889"]').click();
   assert(await page.getByText('Combine collected data (set)', { exact: false }).count() >= 1, 'Linux set/foreach structure should be visible');
