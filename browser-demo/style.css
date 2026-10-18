@@ -33,3 +33,5 @@
 @media(max-width:1300px){.graph-layout{grid-template-columns:minmax(250px,0.95fr) minmax(340px,1.2fr)}}
 @media(max-width:1040px){.graph-layout{grid-template-columns:1fr}.logic-pane{position:static;max-height:none}}
 @media(max-width:720px){.structure-children .property{grid-template-columns:1fr}.logic-pane{max-height:none}.logic-leaf-title{font-size:12px}.structure-children{margin-left:5px;padding-left:8px}}
+
+.logic-leaf-summary{display:block;margin-top:5px;color:#425a73;font-size:11px;line-height:1.45;overflow-wrap:anywhere}
