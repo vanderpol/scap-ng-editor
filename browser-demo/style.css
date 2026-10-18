@@ -56,3 +56,12 @@
 .check-scope .result-requirement{margin-top:6px}
 .check-scope .result-requirement span{font-weight:650;color:#284967}
 .check-scope>small{display:block;color:#61758a;margin-top:9px;line-height:1.5}
+
+
+/* Show authored shellcommand text at the collection, not buried in Object internals. */
+.shellcommand-panel{border:1px solid #c9ddec;background:white;border-radius:8px;padding:12px;margin:12px 0}
+.shellcommand-heading{font-weight:700;font-size:13px;color:#294b69;margin-bottom:6px}
+.shellcommand-heading small{font-weight:400;color:#6a7990}
+.shellcommand-panel code{overflow-wrap:anywhere}
+.shellcommand-panel p{font-size:12px;line-height:1.5}
+.command-editor{display:block;width:100%;min-height:100px;max-height:300px;resize:vertical;margin-top:6px;background:#f9fbfe;border:1px solid #c5d7e7;border-radius:6px;padding:10px;font:12px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace;overflow-wrap:anywhere;white-space:pre-wrap}
