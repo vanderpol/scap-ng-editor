@@ -10,6 +10,10 @@
 
 > **The shared contract for ChatGPT, Codex, and human contributors.** Read this file and root `AGENTS.md` before beginning development. Commit updates to this file alongside meaningful implementation milestones. The **repository** is the communication medium; chat prompts are not the durable project specification. This file is not an autonomous job queue or a signal that a task is running.
 
+## Research checkpoint — AI-first authoring, 18 October 2026
+
+The owner raised an AI-first direction: make a **ChatGPT-style conversational Assessment agent**, with **human proofing and sample-data tests**, a possible principal authoring interface alongside VS Code/standalone. [Research issue #4](https://github.com/vanderpol/scap-ng-editor/issues/4) and [architecture/use-case packet](AI-FIRST-AUTHORING-AGENT.md) document three feasible clients over **one version-pinned source/validation/fixture core**. The agent proposes content and cases; independent deterministic evaluation and authenticated human approval establish separate truth/publishing gates. On personal Plus, new custom GPT creation is currently unavailable, so avoid designing an immediate dependency on that product. **No code implementation, schema promotion, changed stack approval, Codex task or gate reopening is implied.** Existing Assessment-first source preservation and semantic #229 hold remain intact.
+
 ## One-sentence product goal
 
 Build an **Assessment-only SCAP-NG editor** that creates, opens, safely edits, and validates complete automated, manual, and applicability Assessments, with guided editing and a synchronized native YAML/JSON view. It must later plug into a Benchmark → Rule → Assessment authoring workbench without a second editing engine.
