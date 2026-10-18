@@ -22,6 +22,8 @@ try {
   assert.equal(await guestRefs.count(), 2, 'Guests Test must visibly repeat as one referenced definition');
   await guestRefs.first().click();
   assert((await page.locator('#test-inspector').innerText()).includes('Shared Test: 2 references'), 'shared Test references should be explained');
+  assert((await page.locator('#test-inspector').innerText()).includes('What the collected data must satisfy (States:'), 'plain-English State heading should be visible with the technical term');
+  assert((await page.locator('#test-inspector').innerText()).includes('Where the data comes from (Object)'), 'collection heading should explain its purpose');
   assert((await page.locator('#test-inspector').innerText()).includes('windows-userright-object'), 'shared Object should be reachable in Test details');
 
   await page.locator('#test-inspector .inspector-section').last().locator('summary').click();
@@ -29,6 +31,7 @@ try {
   assert((await selects.count()) > 0, 'Focused Test editing should offer requirement choices');
   const choices = await selects.first().locator('option').allTextContents();
   assert(choices.length > 1, 'Requirement selector should contain other choices');
+  assert(choices.some(x => x.includes('must match (at_least_one_exists_and_')), 'dropdown options must explain requirements and retain the native spelling');
   await selects.first().selectOption({ index: 1 });
   await page.locator('[data-view="source"]').click();
   const source = await page.locator('#rawyaml').inputValue();
@@ -41,9 +44,9 @@ try {
   assert(await page.locator('.sample-mock button').isDisabled(), 'sample evaluation must remain disabled');
 
   await page.locator('[data-id="SV-257889"]').click();
-  assert(await page.getByText('Object Set', { exact: false }).count() >= 1, 'Linux set/foreach structure should be visible');
+  assert(await page.getByText('Combine collected data (set)', { exact: false }).count() >= 1, 'Linux set/foreach structure should be visible');
   await page.locator('[data-id="SV-214228"]').click();
-  assert((await page.locator('#test-inspector').innerText()).includes('Variable dependencies'), 'Apache variable dependencies should be linked');
+  assert((await page.locator('#test-inspector').innerText()).includes('How required values are calculated (Variables:'), 'Apache variable dependencies should be linked');
   await page.locator('[data-id="SV-259345"]').click();
   assert((await page.locator('.logic-group').count()) >= 2, 'DNS has nested alternatives');
 
