@@ -1,6 +1,6 @@
 # Shared Development Plan — SCAP-NG Assessment Editor
 
-**Updated:** 2026-10-15  
+**Updated:** 2026-10-18  
 **Status:** A **static pre-alpha browser demonstration** is implemented and published via GitHub Pages (18 Oct); a full source-preserving editor, tested SCAP-NG evaluator, interactive agent backend and offline VS Code extension are **not** implemented/validated. New commits must cite real GitHub issues.  
 **Repository:** `vanderpol/scap-ng-editor` (`main`)  
 **Primary work item:** [Assessment-first MVP #2](https://github.com/vanderpol/scap-ng-editor/issues/2)  
@@ -9,6 +9,16 @@
 **Future product decision:** [Full workbench vs. editor entrypoint #1](https://github.com/vanderpol/scap-ng-editor/issues/1)
 
 > **The shared contract for ChatGPT, Codex, and human contributors.** Read this file and root `AGENTS.md` before beginning development. Commit updates to this file alongside meaningful implementation milestones. The **repository** is the communication medium; chat prompts are not the durable project specification. This file is not an autonomous job queue or a signal that a task is running.
+
+## Hierarchy-first / complexity iteration — 18 October 2026
+
+**Owner direction:** assess progressively harder real source-backed Assessments, improve the editor where it obscures the logic, and use the feedback to evaluate accessibility/adoption potential. [Six-case audit](EDITOR-COMPLEXITY-AUDIT-2026-10-18.md) / [editor issue #10](https://github.com/vanderpol/scap-ng-editor/issues/10).
+
+- **Updated pre-alpha browser-demo:** six instead of two pinned Rule/Assessment pairs; a visible AND/OR/NOT tree is now the default graphical view. Selecting a Test reveals a focused, recursively nested collector/State inspector, distinct Item/field match scopes, readable condition summaries and cross-references for reused Tests and shared Objects. Set/for_each labels and reachable Variable/Object dependency outlines support the difficult RHEL, DNS and Apache fixtures.
+- **Editor-only validation evidence:** JavaScript parsed successfully in a V8 syntax check. Function-level smoke verified rendered nested OR, 2 references to one Guests Test, human condition summary, record nesting and shared Object dependency. The `browser-demo/tests/smoke.mjs` script was expanded to all six cases but its full Chrome/GitHub Actions execution is **not verified in this handoff**. Do not represent syntax/debug tests as independent browser, schema or scanner conformance.
+- **Sample evaluation intentionally inert:** display placeholders for future typed Items, source status, interpreter execution and six-state trace. Entry/run controls are disabled until the tested SCAP-NG interpreter is integrated. Add/remove/link/unlink controls are only disabled hints until source-preserving structural editing and reference safety exist.
+- **Usability verdict:** likely meaningful gain for real moderate Boolean trees, particularly Windows SV-253495; not yet convincing as an easier-than-YAML authoring experience for deeply dependent Apache/DNS/RHEL Sets and Variables. Prioritize context-preserving dependency drilldown and usability tests, not schema changes or more generic form controls.
+- **Next objective:** contrast novice-auditor comprehension/time/accuracy for YAML versus graphical view across all six samples, and enhance focus mode/dependency paths before claiming broad adoption benefit. Respect the still-open SCAP-NG 0.4 semantic gate #229 and source-preserving document core #3. Optional future AI Redesign is separately parked in [#11](https://github.com/vanderpol/scap-ng-editor/issues/11), not core delivery.
 
 ## Browser demo delivery — 18 October 2026
 
