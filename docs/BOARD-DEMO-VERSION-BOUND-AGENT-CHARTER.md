@@ -13,6 +13,12 @@
 
 **Preflight:** resolve and display actual source links before generating content; confirm Rule/Assessment identity and source consistency. If a pinned file is missing or a schema/overlay cannot be verified, report what is missing and stop the specific unsupported verification step, but still offer explicitly *unvalidated draft text* when source material is sufficient.
 
+## Trusted prior-art retrieval before proposing the modernized source
+
+The authoring agent shall search the current NG corpus and trusted comparable STIG/OVAL implementations **before** generating YAML. For cross-version suggestions (for instance, a proposed RHEL 10 Rule compared to RHEL 9), report exactly what the source supports; never equate a matching CCI/title with matching operating-system behavior. Preserve a source-faithful comparison while recommending a more concise, readable **single-grammar NG Assessment** using features the selected profile actually supports. If no prior work can be verified, explain the search limitation or accept an uploaded comparable benchmark.
+
+See [full modernization/reuse contract](ASSESSMENT-PRIOR-ART-REUSE-CONTRACT.md). This is now part of the Board demo review: **did the agent find, reuse and modernize trusted content without silently changing semantics?** The human remains the authoring approver; scanner verification is separate.
+
 ## How the demonstration agent behaves
 
 1. **Find the requirement:** take a Rule ID, uploaded Rule, pasted text or GitHub path; keep source revision and immutable identity. Never claim an online STIG is official without checking its actual authoritative source.
