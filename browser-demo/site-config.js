@@ -19,3 +19,15 @@ window.SCAPNG_COMPLETE_CATALOG = Object.freeze({
   revision: "1378a794a6f793093849e06959b5b2044bcff2c0",
   manifestPath: "complete-stigs/manifest.json"
 });
+
+/* Guided authoring is fail-closed: capability State field lists are read from
+   these matching, immutable upstream 0.4-A mappings, not invented by the UI. */
+window.SCAPNG_GUIDED_MAPPINGS = Object.freeze({
+  repository: "vanderpol/scap-ng",
+  revision: "74b9551f516972ad7ab979c8e39897933e6a9a93",
+  specificationVersion: "0.4.0",
+  capabilities: Object.freeze([
+    "independent.textfilecontent54",
+    "unix.file"
+  ])
+});
