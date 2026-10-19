@@ -28,6 +28,8 @@ window.SCAPNG_GUIDED_MAPPINGS = Object.freeze({
   specificationVersion: "0.4.0",
   capabilities: Object.freeze([
     "independent.textfilecontent54",
-    "unix.file"
+    "unix.file",
+    "unix.symlink",
+    "windows.registry"
   ])
 });
