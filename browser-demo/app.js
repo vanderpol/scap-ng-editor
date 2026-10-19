@@ -1237,8 +1237,8 @@
     $("title").textContent="New Assessment — start from your goal";
     $("state").textContent="Incomplete draft · no scanner";
     $("notice").textContent="Start blank. Nothing is linked to a STIG or prefilled from a RHEL example.";
-    $("content").innerHTML='<section class="card"><h3>What security requirement do you want to check?</h3>'+
-      '<p>Describe your goal. Then build independent checks using supported capabilities.</p>'+
+    $("content").innerHTML='<section class="card"><h3>1 · Choose target platform</h3>'+
+      '<p>Select the operating system first to narrow the available evidence collectors and Tests. Then describe the security goal.</p>'+
       '<form id="blank-create" class="standalone-create">'+
       '<label for="blank-platform">'+esc(guidedPrompt("authoring.target_platform","Which operating system will this Assessment check?"))+'</label>'+
       '<select id="blank-platform" name="platform" required>'+
@@ -1248,6 +1248,7 @@
       '<option value="macos" disabled>'+esc(guidedPlatformLabel("macos"))+' — Guided checks not ready</option>'+
       '<option value="solaris" disabled>'+esc(guidedPlatformLabel("solaris"))+' — Guided checks not ready</option></select>'+
       '<p class="help">Only capability forms already supported for the selected platform will appear. This does not add or infer SCAP-NG applicability.</p>'+
+      '<h3>2 · Describe the security goal</h3>'+
       '<label for="blank-goal">'+esc(guidedPrompt("assessment.assessment_title","Security requirement"))+'</label>'+
       '<textarea name="goal" id="blank-goal" required rows="3" placeholder="Example: Audit logs must be owned by root and not writable by other users"></textarea>'+
       '<label for="blank-id">Suggested Assessment ID (editable)</label>'+
