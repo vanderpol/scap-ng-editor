@@ -1234,8 +1234,13 @@
     const map=guidedMaps.get(capability);
     if(!map||!Object.values(map.native.state_field_map).includes(field))return null;
     const types=map.native.field_datatypes[field]||[];
-    return types.includes("boolean")?"boolean":types.includes("integer")?"integer":
-      types.includes("string")?"string":null;
+    // This form explicitly creates a literal *string* textfilecontent54 match,
+    // not a Boolean/integer typed instance of this multi-datatype field.
+    if(capability==="independent.textfilecontent54"&&field==="text"&&types.includes("string"))
+      return "string";
+    // All other multi-datatype fields need an explicit datatype chooser first.
+    if(types.length!==1)return null;
+    return types[0]==="boolean"||types[0]==="integer"||types[0]==="string"?types[0]:null;
   };
   const guidedStateFields=capability=>{
     const map=guidedMaps.get(capability);
