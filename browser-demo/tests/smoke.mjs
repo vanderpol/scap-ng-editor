@@ -95,6 +95,13 @@ try {
   assert.deepEqual(Object.keys(afterRemoval.assessment.tests),['audit-log-owned-by-root-test']);
   assert.equal(afterRemoval.assessment.evaluate.test,'audit-log-owned-by-root-test',
     'removing one Test must collapse the expression without dangling references');
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.waitForFunction(() => document.querySelectorAll('.stig-toggle').length >= 4, {timeout:45000});
+  await page.locator('[data-standalone="'+ga.id+'"]').click();
+  assert(await page.locator('#generic-add-test').isVisible(),
+    'reload must restore blank-authoring mode rather than falling back to the old RHEL preset');
+  assert.equal(await page.locator('.generic-check').count(),1,
+    'localStorage reload must preserve the author-created check and its safe expression');
 
   // Original RHEL walkthrough remains optional and separate from blank flow.
   await page.locator('#new-assessment').click();
