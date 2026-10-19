@@ -703,7 +703,7 @@
     });
     const raw=$("rawyaml");
     if(raw){raw.oninput=()=>{$("rawStatus").textContent="Unapplied changes — apply before switching";dirtySource=true};
-      $("applyYAML").onclick=()=>{try{const p=parse(raw.value),d=doc();if(p.kind!=="assessment"||p.id!==d.id)throw Error("Assessment id must stay "+d.id+" in this demo");d.tree=p.tree;d.source=raw.value;d.changed=true;dirtySource=false;saveState();display("Source parsed and graphical views updated");render()}catch(ex){display("Source error: "+ex.message,true);$("rawStatus").textContent=ex.message}}}
+      $("applyYAML").onclick=()=>{try{const p=parse(raw.value),d=doc();if(p.kind!=="assessment"||p.id!==d.id)throw Error("Assessment id must stay "+d.id+" in this demo");d.tree=p.tree;d.source=raw.value;d.changed=true;dirtySource=false;saveState();indexRules();library();display("Source parsed and graphical views updated");render()}catch(ex){display("Source error: "+ex.message,true);$("rawStatus").textContent=ex.message}}}
     const p=$("prev");if(p)p.onclick=()=>{step--;render()};
     const n=$("next");if(n)n.onclick=()=>{step++;render()};
     const x=$("gotoSource");if(x)x.onclick=()=>setView("source");
@@ -723,7 +723,7 @@
     if(imported)display("Imported "+imported+" source document(s). This is a local browser draft.");
   };
   $("export").onclick=()=>{if(!doc())return;let raw=$("rawyaml");if(raw&&raw.value!==doc().source){display("Apply source edits before exporting",true);return}download(doc().name,doc().source,"text/yaml");display("YAML downloaded to your device")};
-  $("original").onclick=()=>{const d=doc();if(d&&confirm("Restore this Assessment to its original loaded source?")){const p=parse(d.original);d.source=d.original;d.tree=p.tree;d.changed=false;saveState();render();display("Original restored.")}};
+  $("original").onclick=()=>{const d=doc();if(d&&confirm("Restore this Assessment to its original loaded source?")){const p=parse(d.original);d.source=d.original;d.tree=p.tree;d.changed=false;saveState();indexRules();library();render();display("Original restored.")}};
   async function init(){
     if(!window.jsyaml){display("YAML parser asset did not load — app cannot parse files.",true);return}
     display("Loading six pinned source-backed Rule/Assessment examples from public GitHub…");
