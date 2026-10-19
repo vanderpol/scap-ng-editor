@@ -1173,10 +1173,18 @@
       '<label for="create-file">Which text file should be read?</label><input name="file" id="create-file" required value="/etc/issue" spellcheck="false">'+
       '<p class="help">/etc/issue is a common local login-banner file. It does not automatically prove which banner is shown by SSH or another login service.</p>'+
       '<label for="create-line">What exact line must appear? (user-defined)</label><textarea name="line" id="create-line" required rows="3" spellcheck="false" placeholder="Type the required text."></textarea>'+
-      '<p class="help">This initial preset requires at least one complete matching line; it does not compare the entire file or render escape sequences.</p>'+
+      '<p class="help">This preset checks complete matching lines; it does not compare every byte or render a system login banner.</p>'+
+      '<label for="create-scope">How many independent checks do you need?</label><select name="scope" id="create-scope">'+
+      '<option value="single">One required line (one capability, one Test)</option>'+
+      '<option value="protected">Two required lines + file owner and write permissions (two capabilities, three Tests)</option></select>'+
+      '<div id="create-extra-line-wrap" hidden><label for="create-extra-line">Second required line</label>'+
+      '<textarea name="extraLine" id="create-extra-line" rows="3" spellcheck="false" placeholder="A different required banner line"></textarea>'+
+      '<p class="help">The additional permission check uses unix.file and expects root ownership, group_write=false and other_write=false on this same path.</p></div>'+
       '<button class="button primary" type="submit">Create draft and open Guided →</button></form>'+
       '<p class="help" id="create-error" role="alert"></p></section>';
     const goal=$("create-title"),sourceName=$("create-source-title"),fileName=$("create-file"),capability=$("create-capability");
+    const scope=$("create-scope"),extra=$("create-extra-line"),extraWrap=$("create-extra-line-wrap");
+    scope.onchange=()=>{const multi=scope.value==="protected";extraWrap.hidden=!multi;extra.required=multi};
     let sourceNameManuallyEdited=false;
     sourceName.oninput=()=>{sourceNameManuallyEdited=true};
     const suggest=()=>{
@@ -1193,6 +1201,7 @@
           form.elements.namedItem("line").value,
           form.elements.namedItem("capability").value,
           form.elements.namedItem("sourceTitle").value);
+        if(scope.value==="protected")buildProtectedBannerAssessment(a,extra.value);
         const raw=jsyaml.dump(a,{lineWidth:105,noRefs:true});
         const p=parse(raw);
         addDoc(p.id+".assessment.yaml",raw,"Locally created draft");
@@ -1209,6 +1218,7 @@
       path:obj?.select?.full_path?.equals};
   }
   function standaloneWizard(){
+    if(multiBannerParts())return standaloneMultiWizard();
     const {a,t,obj,line,path}=bannerParts();
     if(!a||!t||!obj||typeof line!=="string")
       return '<section class="card"><h3>Source was changed</h3><p>This no longer matches the guided single-line text preset. Source editing is still available.</p><button id="gotoSource" class="button">Review Source</button></section>';
@@ -1360,6 +1370,7 @@
     $("content").querySelectorAll("[data-select-test]").forEach(b=>b.onclick=()=>{selectedTest=b.dataset.selectTest;render();if(innerWidth<780)$("test-inspector")?.scrollIntoView({block:"start"})});
     $("content").querySelectorAll("[data-step]").forEach(b=>b.onclick=()=>{step=Number(b.dataset.step);render()});
     bindStandaloneEditors();
+    bindMultiWizardEditors();
     $("content").querySelectorAll("[data-field]").forEach(e=>e.onchange=()=>{
       const path=JSON.parse(decodeURIComponent(e.dataset.field));
       let d=doc(),v=e.value;
