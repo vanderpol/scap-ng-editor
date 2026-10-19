@@ -1156,7 +1156,23 @@
 
   // Guided authoring field lists are loaded from immutable SCAP-NG mappings.
   const guidedMaps=new Map();
+  let guidedVocabulary=null;
   let guidedMapError="Capability mappings not loaded.";
+  const guidedTerm=(key,fallback)=>guidedVocabulary?.term_scopes?.[key]?.label||fallback;
+  const guidedPrompt=(key,fallback)=>guidedVocabulary?.term_scopes?.[key]?.prompt||fallback;
+  const guidedCapabilityLabel=(capability,fallback)=>guidedVocabulary?.capabilities?.[capability]?.label||fallback;
+  const guidedRegistryLabel=(part,key,fallback)=>guidedVocabulary?.capabilities?.["windows.registry"]?.[part]?.[key]?.label||fallback;
+  function resolveGuidedNativePointer(capability,pointer,mappings){
+    if(typeof pointer!=="string"||!/^native\.(?:selector_value_enums|state_value_enums|field_datatypes)\.[a-z][a-z0-9_]*$/.test(pointer))
+      throw Error("Unsafe authoring vocabulary option source");
+    const parts=pointer.split(".");
+    const choices=parts.reduce((acc,part)=>acc?.[part],mappings.get(capability));
+    if(!Array.isArray(choices)||choices.length===0||
+       choices.some(v=>typeof v!=="string"||!v.trim())||
+       new Set(choices).size!==choices.length)
+      throw Error("Missing/invalid version-pinned option choices for "+capability+": "+pointer);
+    return choices;
+  }
   async function loadGuidedMappings(){
     const c=window.SCAPNG_GUIDED_MAPPINGS;
     if(!c?.repository||!/^[0-9a-f]{40}$/.test(c.revision)||
@@ -1175,8 +1191,35 @@
           throw Error("Mismatched or incomplete mapping");
         return [capability,m];
       }));
-      guidedMaps.clear();loaded.forEach(([key,value])=>guidedMaps.set(key,value));guidedMapError="";
-    }catch(err){guidedMaps.clear();guidedMapError="Pinned mapping unavailable: "+err.message}
+      const byCapability=new Map(loaded);
+      if(typeof c.vocabularyPath!=="string"||c.vocabularyPath!=="schema/v0.4.0/authoring-vocabulary.en.json")
+        throw Error("Missing pinned authoring vocabulary path");
+      const vocabResponse=await fetch("https://raw.githubusercontent.com/"+c.repository+"/"+c.revision+"/"+c.vocabularyPath,{cache:"force-cache"});
+      if(!vocabResponse.ok)throw Error("Vocabulary HTTP "+vocabResponse.status);
+      const vocabulary=await vocabResponse.json();
+      if(vocabulary.format!=="scap-ng-authoring-vocabulary/0.1"||
+         vocabulary.schema_version!==c.specificationVersion||
+         vocabulary.language!=="en"||vocabulary.normative!==false||
+         !vocabulary.term_scopes?.["test.require"]?.label||
+         !vocabulary.term_scopes?.["state.field.require"]?.label)
+        throw Error("Vocabulary incompatible with pinned 0.4-A schema");
+      for(const capability of c.capabilities){
+        if(!vocabulary.capabilities?.[capability]?.label)
+          throw Error("Vocabulary has no description of "+capability);
+      }
+      const reg=vocabulary.capabilities["windows.registry"];
+      for(const [part,fields,kind] of [
+        ["selectors",reg.selectors,"allowed_values_source"],
+        ["state_fields",reg.state_fields,"allowed_values_source"],
+        ["state_fields",reg.state_fields,"datatype_choices_source"]]){
+        for(const entry of Object.values(fields||{})){
+          if(Object.hasOwn(entry,kind))
+            resolveGuidedNativePointer("windows.registry",entry[kind],byCapability);
+        }
+      }
+      guidedMaps.clear();loaded.forEach(([key,value])=>guidedMaps.set(key,value));
+      guidedVocabulary=vocabulary;guidedMapError="";
+    }catch(err){guidedMaps.clear();guidedVocabulary=null;guidedMapError="Pinned mapping/vocabulary unavailable: "+err.message}
     if(creatingStandalone||doc()?.guidedGeneric)render();
   }
   const assessmentIdValid=id=>/^[a-z0-9]+(?:[a-z0-9.-]*[a-z0-9])?$/.test(id);
@@ -1192,7 +1235,7 @@
     $("content").innerHTML='<section class="card"><h3>What security requirement do you want to check?</h3>'+
       '<p>Describe your goal. Then build independent checks using supported capabilities.</p>'+
       '<form id="blank-create" class="standalone-create">'+
-      '<label for="blank-goal">Security requirement</label>'+
+      '<label for="blank-goal">'+esc(guidedPrompt("assessment.assessment_title","Security requirement"))+'</label>'+
       '<textarea name="goal" id="blank-goal" required rows="3" placeholder="Example: Audit logs must be owned by root and not writable by other users"></textarea>'+
       '<label for="blank-id">Suggested Assessment ID (editable)</label>'+
       '<input id="blank-id" name="id" required spellcheck="false" placeholder="custom.audit-log-protection">'+
@@ -1452,10 +1495,7 @@
     if(!genericTreeReady(a))return '<section class="card"><h3>Source structure needs review</h3>'+
       '<p>This Assessment contains a more advanced or inconsistent expression than the bounded Guided authoring builder can safely edit. Source is preserved.</p>'+
       '<button id="gotoSource" class="button">Inspect YAML</button></section>';
-    const caps=[["independent.textfilecontent54","Find text in a Linux file"],
-                ["unix.file","Inspect Linux file owner/permissions"],
-                ["unix.symlink","Inspect a Unix symbolic link target"],
-                ["windows.registry","Inspect a Windows Registry entry"]];
+    const caps=[...guidedMaps.keys()].map(capability=>[capability,guidedCapabilityLabel(capability,capability)]);
     const capabilities=caps.filter(([key])=>guidedMaps.has(key));
     const capList=capabilities.map(([key,name])=>'<option value="'+esc(key)+'">'+esc(name)+' — '+esc(key)+'</option>').join("");
     const op=a.evaluate?.any?"any":"all";
@@ -1465,7 +1505,7 @@
       const details=isText?'<label>Complete required line (textfilecontent54)</label>'+
         '<textarea rows="2" data-generic-line="'+esc(id)+'">'+esc(t.states[0]?.text?.equals??"")+'</textarea>'+
         '<p class="help">One independent Test checks one required line. Add a separate Test for another required line.</p>':
-        '<h4>What must be true of the same collected '+(isRegistry?"registry entry":isText?"line":"file or link")+'?</h4>'+
+        '<h4>'+esc(guidedTerm("test.states","What must be true"))+' of the same collected '+(isRegistry?"registry entry":isText?"line":"file or link")+'?</h4>'+
         t.states.map((entry,index)=>{
           const name=Object.keys(entry)[0],p=entry[name],type=genericSupportedField(t.capability,name);
           const choices=guidedValueEnums(t.capability,name)||(type==="boolean"?["true","false"]:null);
@@ -1478,7 +1518,7 @@
             '<button class="button" data-generic-remove-state="'+esc(id)+'" data-index="'+index+'" '+(t.states.length<=1?"disabled":"")+' title="Remove this expected field">Remove</button></div>';
         }).join("")+
         (t.states.length>1?field(["assessment","tests",id,"states_match"],
-            "How conditions on this collected Item combine",t.states_match,["all","any","one","odd"]):"")+
+            guidedPrompt("test.states_match","How conditions on this collected Item combine"),t.states_match,["all","any","one","odd"]):"")+
         '<form class="generic-add-state" data-generic-add-state="'+esc(id)+'">'+
         '<label>Add another condition to this SAME collected '+(isRegistry?"registry entry":"Item")+'</label>'+
         '<div class="generic-cond-add"><select data-generic-field-for="'+esc(id)+'" aria-label="Expected field to add">'+
@@ -1504,14 +1544,14 @@
     }).join("");
     const addDisabled=capabilities.length!==4;
     return '<section class="card"><h3>Guided Assessment — started from your goal</h3>'+
-      field(["assessment","assessment_title"],"Security requirement",a.assessment_title)+
+      field(["assessment","assessment_title"],guidedTerm("assessment.assessment_title","Security requirement"),a.assessment_title)+
       field(["assessment","id"],"Assessment ID",a.id)+
       '<p class="help">Not tied to any STIG. The editor will not invent collection results or a scanner verdict.</p>'+
       '<p><strong>'+entries.length+' independent check'+(entries.length===1?"":"s")+'</strong> · '+
       new Set(entries.map(([,t])=>t.capability)).size+' capabilities</p>'+
       (entries.length===0?'<p class="warning">Incomplete draft: no Tests yet. Add your first check below.</p>':"")+
       '</section>'+
-      (entries.length>1?'<section class="card"><h3>How do the independent checks combine?</h3>'+
+      (entries.length>1?'<section class="card"><h3>'+esc(guidedPrompt("assessment.evaluate","How do the independent checks combine?"))+'</h3>'+
         '<select id="generic-logic" aria-label="Combine independent Tests">'+
         '<option value="all" '+(op==="all"?"selected":"")+'>ALL checks must succeed (AND)</option>'+
         '<option value="any" '+(op==="any"?"selected":"")+'>ANY check may succeed (OR)</option></select>'+
@@ -1525,16 +1565,16 @@
       '<input id="generic-check-title" required placeholder="Example: The audit log must be owned by root">'+
       '<label for="generic-check-id">Suggested Test ID (editable)</label>'+
       '<input id="generic-check-id" required spellcheck="false" placeholder="audit-log-owned-by-root-test">'+
-      '<label for="generic-capability">How should the data be collected?</label>'+
+      '<label for="generic-capability">'+esc(guidedPrompt("test.capability","How should the data be collected?"))+'</label>'+
       '<select id="generic-capability" '+(addDisabled?"disabled":"")+'>'+capList+'</select>'+
       '<label for="generic-path" id="generic-path-label">Absolute Linux file to inspect</label>'+
       '<input id="generic-path" required spellcheck="false" placeholder="/var/log/secure">'+
       '<div id="generic-registry-group" hidden class="generic-dynamic">'+
-      '<label for="generic-hive">Windows Registry hive</label><select id="generic-hive">'+
+      '<label for="generic-hive">'+esc(guidedRegistryLabel("selectors","hive","Windows Registry hive"))+'</label><select id="generic-hive">'+
       (guidedMaps.get("windows.registry")?.native?.selector_value_enums?.hive||[]).map(h=>
         '<option value="'+esc(h)+'">'+esc(h.replaceAll("_"," "))+'</option>').join("")+
       '</select>'+
-      '<label for="generic-registry-name">Registry value name (not the default/unnamed value)</label>'+
+      '<label for="generic-registry-name">'+esc(guidedRegistryLabel("selectors","name","Registry value name"))+' (not the default/unnamed value)</label>'+
       '<input id="generic-registry-name" spellcheck="false" placeholder="ExampleValue"></div>'+
       '<div id="generic-line-group" class="generic-dynamic"><label for="generic-line">Exact complete line required in the file</label>'+
       '<textarea id="generic-line" rows="2" placeholder="Required notice text"></textarea></div>'+
