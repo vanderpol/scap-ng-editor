@@ -13,6 +13,13 @@
 - Draft edits are stored in **the local browser storage for that origin**, not on GitHub or an AI service. The app performs no GitHub writes. The user remains responsible for exporting a reviewed copy.
 - The **Sample data tab is now a deliberately disabled mock** showing where typed Items, source status and a future interpreter trace will go. Input/evaluate controls do not run until the editor is integrated with a tested SCAP-NG scanner evaluation kernel.
 
+## Create a standalone Assessment in Guided mode (experimental)
+
+- **My Assessments → + New Assessment** works without selecting a STIG, Rule or benchmark. A bounded, task-first RHEL example begins with a `/etc/issue` text file and prompts for **user-supplied required text**. The new draft is stored locally and remains accessible from My Assessments on reload; it can be viewed in Guided, Graphical, Source or Split and exported as YAML.
+- This first creation preset uses **0.4-A base-draft** `independent.textfilecontent54` with an explicit `object.select` (`full_path`, literal-escaped `pattern`, `instance >= 1`), materialized collection behavior flags, `states.text` and **`require`**, rather than the different **r3 scoped research** `collected_items_require` vocabulary still present in imported review fixtures. They must not be silently mixed. No B language is emitted.
+- The editor asks human questions such as **Where should we look?**, **What exact line must appear?** and **When should the check succeed?**. It retains OVAL-derived `Object`, `State` and native keys in Source and advanced details, while keeping the first-read workflow focused on authoring a requirement.
+- **Semantics are deliberately narrow:** it looks for one complete required line in the selected file, not every byte of the file, not the expanded/rendered login banner, and not necessarily the SSH banner. The required line is a literal user value; punctuation is escaped before creating the regular-expression pattern. `/etc/issue` is illustrative, not a statement of a universal RHEL file policy.
+- **Important:** the current browser demo still performs only YAML parsing, not full version-pinned schema/reference validation or real scanner execution. Any local draft remains **NOT SCANNER-VERIFIED** until the actual scanner kernel is integrated. The generic create-any-capability workbench is not yet implemented. Track [standalone authoring #13](https://github.com/vanderpol/scap-ng-editor/issues/13).
 ## Verified limitations
 
 - The logic tree and nested Test inspector are navigable, but **Add/Remove/Unlink are still disabled plans**; changing graph structure safely requires the source-preserving AST plus reference/semantic validation. Source mode remains the expert route.
