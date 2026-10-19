@@ -24,7 +24,7 @@ window.SCAPNG_COMPLETE_CATALOG = Object.freeze({
    these matching, immutable upstream 0.4-A mappings, not invented by the UI. */
 window.SCAPNG_GUIDED_MAPPINGS = Object.freeze({
   repository: "vanderpol/scap-ng",
-  revision: "770cef0c32707f3a1f9a1b1699d28f45796db430",
+  revision: "d3331311328c9dc2d1977655d7572d1e70a57cb0",
   specificationVersion: "0.4.0",
   vocabularyPath: "schema/v0.4.0/authoring-vocabulary.en.json",
   capabilities: Object.freeze([
