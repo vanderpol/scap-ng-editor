@@ -149,3 +149,16 @@
 .rule-navigation .button{font-size:12px;padding:6px 9px;min-width:0}
 .rule-navigation span{font-size:11px;color:#627a90;white-space:nowrap}
 @media(max-width:580px){.rule-navigation{flex-wrap:wrap}.rule-navigation span{order:-1;flex:0 0 100%;text-align:center}}
+
+/* Standalone Assessment authoring lives inside the Studio, separate from STIGs. */
+.asidehead .stig-library-heading{margin-top:17px;padding-top:13px;border-top:1px solid #d8e5ef}
+.asidehead #new-assessment{display:block;width:100%;margin:8px 0;text-align:center}
+.personal-assessments{display:flex;flex-direction:column;gap:3px;padding:4px 0 6px}
+.personal-assessments .help{font-size:11px;line-height:1.35;color:#5f7282;margin:3px 0}
+.personal-assessment{border:0;background:transparent;color:#275572;text-align:left;padding:9px 10px;border-radius:5px;cursor:pointer;font-size:12px;overflow-wrap:anywhere}
+.personal-assessment:hover,.personal-assessment.active{background:#e7f2fd}
+.standalone-create{display:flex;flex-direction:column;gap:9px;max-width:780px}
+.standalone-create label{font-weight:650;font-size:12px;color:#365a75}
+.standalone-create input,.standalone-create textarea,#banner-line{width:100%;border:1px solid #bfcfdf;border-radius:7px;padding:10px;background:#fff;color:#1e3547;font-size:14px}
+.standalone-create button{align-self:flex-start;margin-top:10px}
+.content pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:560px;overflow:auto}
