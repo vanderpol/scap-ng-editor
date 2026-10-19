@@ -39,7 +39,9 @@ try {
   assert((await page.locator('#content').innerText()).includes('Incomplete draft: no Tests yet'),
     'blank Assessment must not invent a pass/fail test or fake not_applicable');
   const genericCaps=await page.locator('#generic-capability option').allTextContents();
-  assert.equal(genericCaps.length,2,'Guided supports two pinned capability-native creation prompts');
+  assert.equal(genericCaps.length,4,'Guided exposes four version-pinned capability forms');
+  assert(genericCaps.some(x=>x.includes('unix.symlink')));
+  assert(genericCaps.some(x=>x.includes('windows.registry')));
   await page.locator('#generic-check-title').fill('Audit log owned by root');
   assert.equal(await page.locator('#generic-check-id').inputValue(),'audit-log-owned-by-root-test');
   await page.locator('#generic-capability').selectOption('unix.file');
@@ -102,6 +104,62 @@ try {
     'reload must restore blank-authoring mode rather than falling back to the old RHEL preset');
   assert.equal(await page.locator('.generic-check').count(),1,
     'localStorage reload must preserve the author-created check and its safe expression');
+
+  // Extend the same blank-authored draft to native symlink and Registry
+  // capabilities. Each form must expose source-specific selectors and fields.
+  await page.locator('#generic-check-title').fill('The editor link resolves to an approved binary');
+  await page.locator('#generic-capability').selectOption('unix.symlink');
+  await page.locator('#generic-path').fill('/etc/alternatives/editor');
+  await page.locator('#generic-field').selectOption('canonical_path');
+  await page.locator('#generic-value').fill('/usr/bin/vim.basic');
+  await page.locator('#generic-add-test button[type="submit"]').click();
+  assert.equal(await page.locator('.generic-check').count(),2);
+  await page.locator('#generic-check-title').fill('Registry setting uses string type');
+  await page.locator('#generic-capability').selectOption('windows.registry');
+  assert(await page.locator('#generic-registry-group').isVisible(),
+    'Windows Registry capability must reveal hive/key/name selectors');
+  assert.equal(await page.locator('#generic-path-label').innerText(),'Windows Registry key');
+  await page.locator('#generic-hive').selectOption('local_machine');
+  await page.locator('#generic-path').fill('SOFTWARE\ExampleVendor\Security');
+  await page.locator('#generic-registry-name').fill('SecurityMode');
+  await page.locator('#generic-field').selectOption('type');
+  assert.equal(await page.locator('#generic-value').evaluate(e=>e.tagName),'SELECT',
+    'Registry type is constrained by pinned enum');
+  await page.locator('#generic-value').selectOption('string');
+  await page.locator('#generic-add-test button[type="submit"]').click();
+  assert.equal(await page.locator('.generic-check').count(),3);
+  const registryStateForm=page.locator('[data-generic-add-state="registry-setting-uses-string-type-test"]');
+  await registryStateForm.locator('[data-generic-field-for]').selectOption('hive');
+  await registryStateForm.locator('button[type="submit"]').click();
+  assert.equal(await page.locator('[data-generic-hive]').inputValue(),'local_machine');
+  await page.locator('[data-view="source"]').click();
+  const crossOS=await page.evaluate(raw=>window.jsyaml.load(raw),await page.locator('#rawyaml').inputValue());
+  const crossTests=crossOS.assessment.tests;
+  const sym=crossTests['the-editor-link-resolves-to-an-approved-binary-test'];
+  assert.equal(sym.capability,'unix.symlink');
+  assert.equal(sym.object.select.full_path.equals,'/etc/alternatives/editor');
+  assert.equal(sym.states[0].canonical_path.equals,'/usr/bin/vim.basic');
+  const reg=crossTests['registry-setting-uses-string-type-test'];
+  assert.equal(reg.capability,'windows.registry');
+  assert.equal(reg.object.select.hive.equals,'local_machine');
+  assert.equal(reg.object.select.key.equals,'SOFTWARE\ExampleVendor\Security');
+  assert.equal(reg.object.select.name.equals,'SecurityMode');
+  assert.equal(reg.states[0].type.equals,'string');
+  assert.equal(reg.states[1].hive.equals,'local_machine');
+  assert.equal(reg.states_match,'all');
+  assert.equal(crossOS.assessment.evaluate.all.length,3,
+    'after removing a Test, newly added symlink and Registry Tests compose with AND');
+  await page.locator('[data-view="guided"]').click();
+  assert.equal(await page.locator('.generic-check').count(),3);
+  // Editing Windows selectors must not alter unrelated Linux Tests.
+  await page.locator('[data-generic-reg-name]').fill('SecurityModeUpdated');
+  await page.locator('[data-generic-reg-name]').press('Tab');
+  await page.locator('[data-view="source"]').click();
+  const changedRegistry=await page.evaluate(raw=>window.jsyaml.load(raw),await page.locator('#rawyaml').inputValue());
+  assert.equal(changedRegistry.assessment.tests['registry-setting-uses-string-type-test'].object.select.name.equals,
+    'SecurityModeUpdated');
+  assert.deepEqual(changedRegistry.assessment.tests['audit-log-owned-by-root-test'],owner,
+    'changing one Registry selector must not rewrite the Unix-file Test');
 
   // Original RHEL walkthrough remains optional and separate from blank flow.
   await page.locator('#new-assessment').click();
