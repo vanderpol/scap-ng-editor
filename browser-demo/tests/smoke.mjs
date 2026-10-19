@@ -130,6 +130,7 @@ try {
   assert.equal(await page.locator('.generic-check').count(),3);
   const registryStateForm=page.locator('[data-generic-add-state="registry-setting-uses-string-type-test"]');
   await registryStateForm.locator('[data-generic-field-for]').selectOption('hive');
+  await registryStateForm.locator('[data-generic-value-host] select').selectOption('local_machine');
   await registryStateForm.locator('button[type="submit"]').click();
   assert.equal(await page.locator('[data-generic-hive]').inputValue(),'local_machine');
   await page.locator('[data-view="source"]').click();
