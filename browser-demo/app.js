@@ -325,6 +325,22 @@
     const options=[...new Set([value,...levels])].map(k=>'<option value="'+esc(k)+'" '+(k===value?"selected":"")+'>'+esc(shortRequireChoice(k))+'</option>').join("");
     return '<select class="quick-require-select" data-field="'+enc+'" aria-label="'+esc(description)+'">'+options+'</select>';
   }
+  function replaceSimpleOperator(tree,base,newOp){
+    const current=getNode(tree,base);
+    if(!current||typeof current!=="object"||Array.isArray(current))throw Error("Matching field is no longer present.");
+    const comparisons=["equals","case_insensitive_equals","matches_regex","greater_than_or_equal","less_than_or_equal","greater_than","less_than"];
+    const found=comparisons.filter(k=>Object.hasOwn(current,k));
+    if(found.length!==1)throw Error("Multiple or unsupported comparisons: use source editing.");
+    const previous=found[0],value=current[previous];
+    const supported=typeof value==="number"?["equals","greater_than","greater_than_or_equal","less_than","less_than_or_equal"]:
+      typeof value==="string"?["equals","case_insensitive_equals","matches_regex"]:["equals"];
+    if(!supported.includes(newOp))throw Error("This comparison is not supported for the current value type.");
+    if(previous===newOp)return previous;
+    const newField={};
+    for(const [key,v] of Object.entries(current))newField[key===previous?newOp:key]=v;
+    putNode(tree,base,newField);
+    return previous;
+  }
   function oneFieldEditor(id,t){
     const shape=simpleMatchShape(t);
     if(!shape)return "";
@@ -349,7 +365,7 @@
     const fieldPath=encodeURIComponent(JSON.stringify(base.concat(op)));
     const opPath=encodeURIComponent(JSON.stringify(base));
     const input=isBool?'<span class="help">Boolean comparison; use Source to change the value.</span>':
-      '<input type="text" class="predicate-value" data-field="'+fieldPath+'" value="'+esc(String(value))+'" aria-label="Expected value for '+esc(name)+'" spellcheck="false">';
+      '<input id="predicate-value" type="text" class="predicate-value" data-field="'+fieldPath+'" value="'+esc(String(value))+'" aria-label="Expected value for '+esc(name)+'" spellcheck="false">';
     return '<div class="inline-predicate" aria-label="Edit expected condition">'+
       '<div class="predicate-heading">Required condition <small>(State)</small></div>'+
       '<div class="predicate-grid">'+
@@ -525,6 +541,24 @@
       if(typeof orig==="number"){const n=Number(v);if(!Number.isFinite(n)){display("Invalid number",true);return}v=n}
       putNode(d.tree,path,v);
       try{d.source=jsyaml.dump(d.tree,{lineWidth:105,noRefs:true});d.changed=true;saveState();display("Draft changed at "+path.slice(-3).join(" / ")+" — YAML reformatted; review before export");render()}catch(ex){putNode(d.tree,path,orig);display(ex.message,true)}
+    });
+    $("content").querySelectorAll("[data-operation]").forEach(e=>e.onchange=()=>{
+      const base=JSON.parse(decodeURIComponent(e.dataset.operation)),d=doc();
+      const existing=getNode(d.tree,base),old=existing&&Object.keys(existing).find(k=>
+        ["equals","case_insensitive_equals","matches_regex","greater_than_or_equal","less_than_or_equal","greater_than","less_than"].includes(k));
+      if(!old||old===e.value){render();return}
+      if(!confirm("Change the comparison from "+old+" to "+e.value+"? This changes the meaning of the check. The browser demo cannot yet validate against a tested SCAP-NG scanner.")){render();return}
+      const previous=structuredClone(existing);
+      try{
+        replaceSimpleOperator(d.tree,base,e.value);
+        const next=jsyaml.dump(d.tree,{lineWidth:105,noRefs:true});
+        parse(next);
+        d.source=next;d.changed=true;saveState();
+        display("Comparison changed in draft — unverified; YAML formatting may change. Review the source before export.");
+        render();
+      }catch(err){
+        putNode(d.tree,base,previous);display("Comparison not changed: "+err.message,true);render();
+      }
     });
     const raw=$("rawyaml");
     if(raw){raw.oninput=()=>{$("rawStatus").textContent="Unapplied changes — apply before switching";dirtySource=true};
