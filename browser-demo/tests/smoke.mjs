@@ -32,6 +32,10 @@ try {
   assert.equal(await page.locator('label[for="blank-goal"]').innerText(),
     'What security requirement should be checked?',
     'blank Guided prompt should come from the version-pinned SCAP-NG authoring vocabulary');
+  const availablePlatforms=await page.locator('#blank-platform option:not([disabled])').evaluateAll(es=>es.map(e=>e.value));
+  assert.deepEqual(availablePlatforms,['linux','windows'],
+    'platform must be the first available choice; macOS/Solaris are visibly unsupported in this Guided pilot');
+  await page.locator('#blank-platform').selectOption('linux');
   assert.equal(await page.locator('#blank-goal').inputValue(),'',
     'the security goal must not prepopulate a RHEL example');
   assert.equal(await page.locator('#blank-id').inputValue(),'');
@@ -42,9 +46,12 @@ try {
   assert((await page.locator('#content').innerText()).includes('Incomplete draft: no Tests yet'),
     'blank Assessment must not invent a pass/fail test or fake not_applicable');
   const genericCaps=await page.locator('#generic-capability option').allTextContents();
-  assert.equal(genericCaps.length,4,'Guided exposes four version-pinned capability forms');
+  assert.equal(genericCaps.length,3,'Linux Guided only exposes the three pinned Linux-compatible forms');
   assert(genericCaps.some(x=>x.includes('unix.symlink')));
-  assert(genericCaps.some(x=>x.includes('windows.registry')));
+  assert(genericCaps.some(x=>x.includes('unix.file')));
+  assert(!genericCaps.some(x=>x.includes('windows.registry')),
+    'Windows Registry must not appear under the Linux target platform');
+  assert.equal(await page.locator('#generic-platform').inputValue(),'linux');
   assert(genericCaps.some(x=>x.includes('Read Windows Registry settings')),
     'registry capability description must come from shared SCAP-NG vocabulary');
   assert((await page.locator('label[for="generic-capability"]').innerText()).includes('Which capability'),
@@ -112,8 +119,11 @@ try {
   assert.equal(await page.locator('.generic-check').count(),1,
     'localStorage reload must preserve the author-created check and its safe expression');
 
-  // Extend the same blank-authored draft to native symlink and Registry
-  // capabilities. Each form must expose source-specific selectors and fields.
+  // Linux authoring stays Linux-only, including after localStorage reload.
+  assert.equal(await page.locator('#generic-platform').inputValue(),'linux');
+  assert(await page.locator('#generic-platform').isDisabled(),
+    'platform cannot be switched while any authored Test would be affected');
+  assert.equal(await page.locator('#generic-capability option[value="windows.registry"]').count(),0);
   await page.locator('#generic-check-title').fill('The editor link resolves to an approved binary');
   await page.locator('#generic-capability').selectOption('unix.symlink');
   await page.locator('#generic-path').fill('/etc/alternatives/editor');
@@ -121,71 +131,14 @@ try {
   await page.locator('#generic-value').fill('/usr/bin/vim.basic');
   await page.locator('#generic-add-test button[type="submit"]').click();
   assert.equal(await page.locator('.generic-check').count(),2);
-  await page.locator('#generic-check-title').fill('Registry setting uses string type');
-  await page.locator('#generic-capability').selectOption('windows.registry');
-  assert(await page.locator('#generic-registry-group').isVisible(),
-    'Windows Registry capability must reveal hive/key/name selectors');
-  assert.equal(await page.locator('#generic-path-label').innerText(),'Windows Registry key');
-  await page.locator('#generic-hive').selectOption('local_machine');
-  await page.locator('#generic-path').fill('SOFTWARE\\ExampleVendor\\Security');
-  await page.locator('#generic-registry-name').fill('SecurityMode');
-  await page.locator('#generic-field').selectOption('type');
-  const registryMap=await page.evaluate(async()=>{
-    const c=window.SCAPNG_GUIDED_MAPPINGS;
-    const response=await fetch('https://raw.githubusercontent.com/'+c.repository+'/'+c.revision+
-      '/schema/v0.4.0/capability-mappings/supported/windows.registry.json');
-    return response.json();
-  });
-  assert.deepEqual(await page.locator('#generic-value option').evaluateAll(options=>options.map(x=>x.value)),
-    registryMap.native.state_value_enums.type,
-    'Registry storage type dropdown must exactly match the pinned capability/schema enumeration');
-  assert((await page.locator('#generic-field option:checked').innerText()).includes('Registry storage type'),
-    'type State option must display the centralized Registry field label');
-  assert((await page.locator('#generic-registry-type-help').innerText()).includes(
-    registryMap.native.field_datatypes.value.join(', ')),
-    'distinct multi-datatype value field must be accurately described from the pinned mapping');
-  assert.equal(await page.locator('#generic-value').evaluate(e=>e.tagName),'SELECT',
-    'Registry type is constrained by pinned enum');
-  await page.locator('#generic-value').selectOption('string');
+  await page.locator('#generic-check-title').fill('Second security notice exists');
+  await page.locator('#generic-capability').selectOption('independent.textfilecontent54');
+  await page.locator('#generic-path').fill('/etc/issue.net');
+  await page.locator('#generic-line').fill('Use of this system is monitored.');
   await page.locator('#generic-add-test button[type="submit"]').click();
   assert.equal(await page.locator('.generic-check').count(),3);
-  const registryStateForm=page.locator('[data-generic-add-state="registry-setting-uses-string-type-test"]');
-  await registryStateForm.locator('[data-generic-field-for]').selectOption('hive');
-  await registryStateForm.locator('[data-generic-value-host] select').selectOption('local_machine');
-  await registryStateForm.locator('button[type="submit"]').click();
-  assert.equal(await page.locator('[data-generic-hive]').inputValue(),'local_machine');
-  await page.locator('[data-view="source"]').click();
-  const crossOS=await page.evaluate(raw=>window.jsyaml.load(raw),await page.locator('#rawyaml').inputValue());
-  const crossTests=crossOS.assessment.tests;
-  const sym=crossTests['the-editor-link-resolves-to-an-approved-binary-test'];
-  assert.equal(sym.capability,'unix.symlink');
-  assert.equal(sym.object.select.full_path.equals,'/etc/alternatives/editor');
-  assert.equal(sym.states[0].canonical_path.equals,'/usr/bin/vim.basic');
-  const reg=crossTests['registry-setting-uses-string-type-test'];
-  assert.equal(reg.capability,'windows.registry');
-  assert.equal(reg.object.select.hive.equals,'local_machine');
-  assert.equal(reg.object.select.key.equals,'SOFTWARE\\ExampleVendor\\Security');
-  assert.equal(reg.object.select.name.equals,'SecurityMode');
-  assert.equal(reg.states[0].type.equals,'string');
-  assert.equal(reg.states[1].hive.equals,'local_machine');
-  assert.equal(reg.states_match,'all');
-  assert.equal(crossOS.assessment.evaluate.all.length,3,
-    'after removing a Test, newly added symlink and Registry Tests compose with AND');
-  await page.locator('[data-view="guided"]').click();
-  assert.equal(await page.locator('.generic-check').count(),3);
-  // Editing Windows selectors must not alter unrelated Linux Tests.
-  await page.locator('[data-generic-reg-name]').fill('SecurityModeUpdated');
-  await page.locator('[data-generic-reg-name]').press('Tab');
-  await page.locator('[data-view="source"]').click();
-  const changedRegistry=await page.evaluate(raw=>window.jsyaml.load(raw),await page.locator('#rawyaml').inputValue());
-  assert.equal(changedRegistry.assessment.tests['registry-setting-uses-string-type-test'].object.select.name.equals,
-    'SecurityModeUpdated');
-  assert.deepEqual(changedRegistry.assessment.tests['audit-log-owned-by-root-test'],owner,
-    'changing one Registry selector must not rewrite the Unix-file Test');
 
-  // A nested branch must serialize actual all/any expression nodes, not an
-  // English summary or a flattened union of same-Item expected conditions.
-  await page.locator('[data-view="guided"]').click();
+  // A nested branch must serialize real all/any, not flatten State requirements.
   assert.equal(await page.locator('[data-generic-pair]').count(),1);
   await page.locator('[data-generic-pair]').selectOption('1');
   await page.locator('[data-generic-nest]').click();
@@ -194,8 +147,8 @@ try {
   assert.equal(nested.assessment.evaluate.all.length,2);
   assert.equal(nested.assessment.evaluate.all[0].test,'audit-log-owned-by-root-test');
   assert.deepEqual(nested.assessment.evaluate.all[1].any.map(x=>x.test),[
-    'the-editor-link-resolves-to-an-approved-binary-test','registry-setting-uses-string-type-test'
-  ],'native logic should preserve A AND (B OR C)');
+    'the-editor-link-resolves-to-an-approved-binary-test','second-security-notice-exists-test'
+  ],'Linux authoring preserves A AND (B OR C) without Windows capability');
   await page.locator('[data-view="guided"]').click();
   const branch=page.locator('[data-generic-group-op]');
   assert.equal(await branch.count(),1);
@@ -203,18 +156,77 @@ try {
   await branch.selectOption('all');
   await page.locator('[data-view="source"]').click();
   const reordered=await page.evaluate(raw=>window.jsyaml.load(raw),await page.locator('#rawyaml').inputValue());
-  assert.equal(reordered.assessment.evaluate.all[1].all.length,2,
-    'author can change inner OR to AND without rewriting outer AND');
+  assert.equal(reordered.assessment.evaluate.all[1].all.length,2);
   await page.locator('[data-view="guided"]').click();
   page.once('dialog',dialog=>dialog.accept());
   await page.locator('[data-generic-group-op]').selectOption('any');
   page.once('dialog',dialog=>dialog.accept());
-  await page.locator('[data-generic-remove-test="registry-setting-uses-string-type-test"]').click();
+  await page.locator('[data-generic-remove-test="second-security-notice-exists-test"]').click();
   await page.locator('[data-view="source"]').click();
   const pruned=await page.evaluate(raw=>window.jsyaml.load(raw),await page.locator('#rawyaml').inputValue());
   assert.deepEqual(pruned.assessment.evaluate.all.map(x=>x.test),[
     'audit-log-owned-by-root-test','the-editor-link-resolves-to-an-approved-binary-test'
-  ],'unlinking a Test inside nested logic must collapse unary groups and retain other branches');
+  ],'nested removal must retain the Linux-only Test references');
+
+  // Windows is a fresh platform-scoped Assessment, not an accidental cross-OS Test.
+  await page.locator('#new-assessment').click();
+  assert(await page.locator('#blank-platform').isVisible());
+  await page.locator('#blank-platform').selectOption('windows');
+  await page.locator('#blank-goal').fill('Windows Registry security mode must be a string');
+  await page.locator('#blank-create button[type="submit"]').click();
+  assert.equal(await page.locator('#generic-platform').inputValue(),'windows');
+  assert.deepEqual(await page.locator('#generic-capability option').evaluateAll(es=>es.map(e=>e.value)),
+    ['windows.registry'],'Windows Guided must not offer unix.file, unix.symlink or Linux textfilecontent54');
+  await page.locator('#generic-check-title').fill('Registry setting uses string type');
+  await page.locator('#generic-capability').selectOption('windows.registry');
+  assert(await page.locator('#generic-registry-group').isVisible());
+  assert.equal(await page.locator('#generic-path-label').innerText(),'Windows Registry key');
+  await page.locator('#generic-hive').selectOption('local_machine');
+  await page.locator('#generic-path').fill('SOFTWARE\ExampleVendor\Security');
+  await page.locator('#generic-registry-name').fill('SecurityMode');
+  await page.locator('#generic-field').selectOption('type');
+  const registryMap=await page.evaluate(async()=>{
+    const c=window.SCAPNG_GUIDED_MAPPINGS;
+    const response=await fetch('https://raw.githubusercontent.com/'+c.repository+'/'+c.revision+
+      '/schema/v0.4.0/capability-mappings/supported/windows.registry.json');
+    return response.json();
+  });
+  assert.deepEqual(await page.locator('#generic-value option').evaluateAll(es=>es.map(e=>e.value)),
+    registryMap.native.state_value_enums.type,'registry storage types must exactly match the pinned mapping');
+  assert((await page.locator('#generic-field option:checked').innerText()).includes('Registry storage type'));
+  assert((await page.locator('#generic-registry-type-help').innerText()).includes(
+    registryMap.native.field_datatypes.value.join(', ')));
+  await page.locator('#generic-value').selectOption('string');
+  await page.locator('#generic-add-test button[type="submit"]').click();
+  assert(await page.locator('#generic-platform').isDisabled(),
+    'Windows platform cannot change after creating a Registry Test');
+  const regForm=page.locator('[data-generic-add-state="registry-setting-uses-string-type-test"]');
+  await regForm.locator('[data-generic-field-for]').selectOption('hive');
+  await regForm.locator('[data-generic-value-host] select').selectOption('local_machine');
+  await regForm.locator('button[type="submit"]').click();
+  await page.locator('[data-view="source"]').click();
+  const winYaml=await page.evaluate(raw=>window.jsyaml.load(raw),await page.locator('#rawyaml').inputValue());
+  assert.deepEqual(Object.values(winYaml.assessment.tests).map(x=>x.capability),['windows.registry']);
+  const reg=winYaml.assessment.tests['registry-setting-uses-string-type-test'];
+  assert.equal(reg.object.select.hive.equals,'local_machine');
+  assert.equal(reg.object.select.key.equals,'SOFTWARE\ExampleVendor\Security');
+  assert.equal(reg.object.select.name.equals,'SecurityMode');
+  assert.equal(reg.states[0].type.equals,'string');
+  assert.equal(reg.states[1].hive.equals,'local_machine');
+  assert.equal(reg.states_match,'all');
+  await page.locator('[data-view="guided"]').click();
+  await page.locator('[data-generic-reg-name]').fill('SecurityModeUpdated');
+  await page.locator('[data-generic-reg-name]').press('Tab');
+  await page.locator('[data-view="source"]').click();
+  const winChanged=await page.evaluate(raw=>window.jsyaml.load(raw),await page.locator('#rawyaml').inputValue());
+  assert.equal(winChanged.assessment.tests['registry-setting-uses-string-type-test'].object.select.name.equals,
+    'SecurityModeUpdated');
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.waitForFunction(() => document.querySelectorAll('.stig-toggle').length >= 4,{timeout:45000});
+  await page.locator('[data-standalone="'+winYaml.assessment.id+'"]').click();
+  assert.equal(await page.locator('#generic-platform').inputValue(),'windows',
+    'platform survives reload and still filters available capabilities');
+  assert.equal(await page.locator('#generic-capability option[value="unix.file"]').count(),0);
 
   // Original RHEL walkthrough remains optional and separate from blank flow.
   await page.locator('#new-assessment').click();
