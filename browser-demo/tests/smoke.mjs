@@ -10,7 +10,9 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('.stig-toggle').length >= 4, { timeout: 45000 });
   const groupFor={
     'SV-257851':'rhel_9','SV-257889':'rhel_9',
+    'SV-257777':'rhel_9','SV-257778':'rhel_9','SV-257798':'rhel_9','SV-257941':'rhel_9',
     'SV-253254':'ms_windows_11','SV-253495':'ms_windows_11',
+    'SV-253255':'ms_windows_11','SV-253308':'ms_windows_11',
     'SV-214228':'apache_server_2-4_unix_server',
     'SV-259345':'ms_windows_server_dns'
   };
@@ -28,12 +30,14 @@ try {
   assert(await page.getByText('Select a STIG, then a Rule').isVisible(),'initial view must not preselect a Rule');
   await page.locator('[data-stig="rhel_9"]').click();
   assert.equal(await page.locator('.stig-rules').count(),1,'one STIG opens its Rules');
+  assert.equal(await page.locator('.stig-rules .rule').count(),445,'RHEL 9 complete pinned STIG must contain 445 Rules');
   assert((await page.locator('[data-id="SV-257851"]').innerText()).includes('Shared Assessment resolved'),
     'shared RHEL automated Assessment must be resolved, not flagged non-automated');
   await page.locator('[data-stig="ms_windows_11"]').click();
   assert.equal(await page.locator('.stig-rules').count(),1,'switching STIGs closes the previous Rule list');
   assert.equal(await page.locator('[data-id="SV-257851"]').count(),0,'previous STIG Rule DOM must be removed');
   assert.equal(await page.locator('[data-id="SV-253495"]').count(),1,'new STIG must show its Rules');
+  assert.equal(await page.locator('.stig-rules .rule').count(),257,'Windows 11 complete pinned STIG must contain 257 Rules');
   await page.locator('[data-stig="ms_windows_11"]').click();
   assert.equal(await page.locator('.stig-rules').count(),0,'clicking open STIG again collapses all Rules');
   for (const id of ['SV-257851','SV-253254','SV-253495','SV-257889','SV-259345','SV-214228']) {
@@ -184,13 +188,46 @@ try {
   await page.locator('#applyYAML').click();
   await page.locator('[data-view="graphical"]').click();
 
+  // Full-STIG field walk: easy Linux collection, manual-only, objectless,
+  // Windows PowerShell record values, and special matching modes.
+  await openRule('SV-257777');
+  assert(await page.getByText('RHEL 9 must be a vendor-supported release.', { exact:false }).count()>0);
+  assert((await page.locator('#test-inspector .combined-check').innerText()).includes('file /etc/redhat-release'),
+    'text-file collection should explain the concrete file being read');
+  await openRule('SV-253255');
+  assert((await page.locator('#test-inspector .combined-check').innerText()).includes('PowerShell Get-Tpm'),
+    'native PowerShell cmdlet should be visible instead of a raw capability label');
+  assert.equal(await page.locator('#test-inspector .record-edit-row').count(),3,
+    'Windows TPM record should offer independent field/value rows');
+  assert((await page.locator('#test-inspector .record-fields').innerText()).includes('tpmpresent'),
+    'nested record fields must be visible without expanding the source tree');
+  await page.locator('#test-inspector .record-edit-row').first().locator('input[data-field]').fill('False');
+  await page.locator('#test-inspector .record-edit-row').first().locator('input[data-field]').press('Tab');
+  await page.locator('[data-view="source"]').click();
+  const recordSource=await page.locator('#rawyaml').inputValue();
+  const recordParsed=await page.evaluate(s=>window.jsyaml.load(s),recordSource);
+  assert.equal(recordParsed.assessment.tests['windows-have-tpm-ready-use-test'].states[0].value.record.fields.tpmpresent.equals,'False',
+    'record value edit must map to its nested State field without changing collection');
+  await openRule('SV-257798');
+  assert((await page.locator('#test-inspector .quick-results').innerText()).includes('Special authored requirement: all_exist_and_all_match'),
+    'unreviewed existence modes must not be mislabeled as a different mode');
+  assert.equal(await page.locator('#test-inspector .quick-results select').count(),0,
+    'special matching mode must not offer an unsafe seven-option dropdown');
+  await openRule('SV-253308');
+  assert(!(await page.locator('#test-inspector .combined-check').innerText()).includes('Unresolved Object reference'),
+    'objectless native collection should not be presented as broken data');
+  await openRule('SV-257778');
+  assert(await page.locator('.manual-assessment').isVisible(),'manual-only Rule should show its authored procedure');
+  assert((await page.locator('#manual-procedure').inputValue()).includes('dnf history'),
+    'manual procedure should be directly readable and editable, not an empty automation panel');
+
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
   mobile.on('pageerror', err => jsErrors.push(err.message));
   await mobile.goto('http://127.0.0.1:8765/', { waitUntil: 'domcontentloaded' });
-  await mobile.waitForFunction(() => document.querySelectorAll('.rule').length >= 6, { timeout: 45000 });
+  await mobile.waitForFunction(() => document.querySelectorAll('.stig-toggle').length >= 4, { timeout: 45000 });
   await mobile.locator('[data-stig="rhel_9"]').click();
   await mobile.locator('[data-id="SV-257851"]').click();
-  assert(await mobile.getByText('Assessment logic', { exact: false }).isVisible(), 'phone graphical view is reachable');
+  assert(await mobile.getByText('How compliance is checked', { exact: false }).isVisible(), 'phone graphical view is reachable');
   assert.deepEqual(jsErrors, [], 'No browser JavaScript exceptions');
 
   console.log('PASS: six pinned complexity fixtures, Windows nested OR/shared Test, inspector editing, Linux Sets, Apache dependencies, sample mock, source and mobile');
