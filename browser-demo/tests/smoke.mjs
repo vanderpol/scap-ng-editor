@@ -7,7 +7,7 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   page.on('pageerror', err => jsErrors.push(err.message));
   await page.goto('http://127.0.0.1:8765/', { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => document.querySelectorAll('.rule').length >= 6, { timeout: 45000 });
+  await page.waitForFunction(() => document.querySelectorAll('.stig-toggle').length >= 4, { timeout: 45000 });
   const groupFor={
     'SV-257851':'rhel_9','SV-257889':'rhel_9',
     'SV-253254':'ms_windows_11','SV-253495':'ms_windows_11',
@@ -24,15 +24,22 @@ try {
     assert.equal(await page.locator('[data-stig="'+stig+'"]').count(),1,'STIG group '+stig+' should be present');
   await page.locator('[data-filter="all"]').click();
   assert.equal(await page.locator('.stig-toggle').count(),4,'All must show STIG headings, not a flat Rule list');
-  assert.equal(await page.locator('.stig-rules:not([hidden])').count(),0,'STIG Rules should be collapsed by default after All');
+  assert.equal(await page.locator('.stig-rules').count(),0,'All should not render any Rules before STIG selection');
+  assert(await page.getByText('Select a STIG, then a Rule').isVisible(),'initial view must not preselect a Rule');
   await page.locator('[data-stig="rhel_9"]').click();
+  assert.equal(await page.locator('.stig-rules').count(),1,'one STIG opens its Rules');
   assert((await page.locator('[data-id="SV-257851"]').innerText()).includes('Shared Assessment resolved'),
     'shared RHEL automated Assessment must be resolved, not flagged non-automated');
-  await page.locator('[data-stig="rhel_9"]').click();
-  const rules = await page.locator('.rid').allTextContents();
+  await page.locator('[data-stig="ms_windows_11"]').click();
+  assert.equal(await page.locator('.stig-rules').count(),1,'switching STIGs closes the previous Rule list');
+  assert.equal(await page.locator('[data-id="SV-257851"]').count(),0,'previous STIG Rule DOM must be removed');
+  assert.equal(await page.locator('[data-id="SV-253495"]').count(),1,'new STIG must show its Rules');
+  await page.locator('[data-stig="ms_windows_11"]').click();
+  assert.equal(await page.locator('.stig-rules').count(),0,'clicking open STIG again collapses all Rules');
   for (const id of ['SV-257851','SV-253254','SV-253495','SV-257889','SV-259345','SV-214228']) {
-    assert(rules.some(s => s.includes(id)), id+' source-backed fixture must load');
     await openRule(id);
+    assert.equal(await page.locator('.stig-rules').count(),1,'only one STIG may show Rules');
+    assert((await page.locator('.rid').allTextContents()).includes(id),id+' must be visible only under its selected STIG');
     assert(await page.locator('.logic-leaf').count() > 0, id+' should show linked Test logic');
     assert(await page.locator('#test-inspector').isVisible(), id+' must have a focused inspector');
   }
