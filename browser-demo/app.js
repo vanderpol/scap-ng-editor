@@ -273,18 +273,41 @@
     for(const k of ["all","any"]){if(Array.isArray(n[k]))n[k].forEach(x=>countTestReferences(x,refs))}
     if(n.not)countTestReferences(n.not,refs);
   }
-  function logic(n,a,refs,depth=0){
+  // Follow explicit Assessment-result references for review without inlining
+  // source definitions into the saved document. Only the owner's root Test
+  // buttons are editable; referenced Assessment previews are read-only.
+  function logic(n,a,refs,depth=0,chain=[]){
     a=a||doc()?.tree.assessment||{};
     refs=refs||(()=>{const counts={};countTestReferences(a.evaluate,counts);return counts})();
     if(!n)return '<p class="warning">No evaluation expression is defined.</p>';
+    if(depth>32)return '<p class="warning">Dependency depth limit reached; inspect source references.</p>';
+    const isLinked=a.id!==doc()?.tree.assessment?.id;
     if(typeof n.test==="string"){
-      const t=a.tests?.[n.test], exists=!!t;
+      const t=a.tests?.[n.test],exists=!!t;
+      if(isLinked){
+        if(!exists)return '<p class="warning">Test '+esc(n.test)+' not loaded in referenced Assessment.</p>';
+        return '<details class="logic-leaf linked-test"><summary>'+esc(t.test_title||n.test)+' <small>Referenced Test · '+esc(n.test)+'</small></summary>'+
+          '<p><strong>Look at:</strong> '+esc(humanCollection(a,t).text)+'</p>'+
+          '<p><strong>Require:</strong> '+esc(summarizeTest(t))+'</p>'+
+          '<p><strong>Collected results:</strong> '+esc(requirementDescription(t.collected_items_require))+'</p>'+
+          '<details class="linked-test-source"><summary>Exact referenced Test (read-only)</summary><pre>'+esc(JSON.stringify(t,null,2))+'</pre></details></details>';
+      }
       return '<button class="logic-leaf '+(selectedTest===n.test?"active":"")+'" data-select-test="'+esc(n.test)+'" '+(!exists?'disabled title="Referenced Test not loaded"':"")+'><span class="logic-leaf-title">'+esc(t?.test_title||n.test)+'</span><span class="logic-leaf-summary">'+esc(t?summarizeTest(t):"Definition unavailable")+'</span><small>'+esc(n.test)+(refs[n.test]>1?' · reused in '+refs[n.test]+' branches':"")+(!exists?" · unresolved":"")+'</small></button>';
     }
-    if(n.not)return '<details class="logic-group" open><summary>NOT — reverse the following condition</summary><div class="logic-children">'+logic(n.not,a,refs,depth+1)+'</div></details>';
+    if(typeof n.assessment==="string"){
+      const id=n.assessment;
+      const referenced=docs.get("assessment:"+id);
+      if(chain.includes(id)||id===a.id)return '<div class="warning">Assessment dependency cycle: '+esc([...chain,id].join(" → "))+'</div>';
+      if(!referenced)return '<div class="warning">Referenced automated Assessment not loaded: <code>'+esc(id)+'</code>. Import its pinned source to inspect the actual checks.</div>';
+      const target=referenced.tree.assessment,counts={};countTestReferences(target.evaluate,counts);
+      return '<details class="logic-group assessment-reference" open><summary>Uses Assessment: '+esc(target.assessment_title||id)+' <small>'+esc(id)+' · source-linked</small></summary>'+
+        '<div class="logic-children"><p class="help">Referenced Assessment, shown for review without rewriting the original definition.</p>'+
+        logic(target.evaluate,target,counts,depth+1,chain.concat([a.id,id]))+'</div></details>';
+    }
+    if(n.not)return '<details class="logic-group" open><summary>NOT — reverse the following condition</summary><div class="logic-children">'+logic(n.not,a,refs,depth+1,chain)+'</div></details>';
     if(Array.isArray(n.all)||Array.isArray(n.any)){
       const op=Array.isArray(n.all)?"all":"any",list=n[op];
-      return '<details class="logic-group" '+(depth<2?"open":"")+'><summary><strong>'+(op==="all"?"AND":"OR")+'</strong> — '+(op==="all"?"every condition must be true":"any condition may be true")+' <small>('+list.length+')</small></summary><div class="logic-children">'+list.map(x=>logic(x,a,refs,depth+1)).join("")+'</div></details>';
+      return '<details class="logic-group" '+(depth<2?"open":"")+'><summary><strong>'+(op==="all"?"AND":"OR")+'</strong> — '+(op==="all"?"every condition must be true":"any condition may be true")+' <small>('+list.length+')</small></summary><div class="logic-children">'+list.map(x=>logic(x,a,refs,depth+1,chain)).join("")+'</div></details>';
     }
     return '<div class="warning">Other evaluation construct — inspect Source: <code>'+esc(JSON.stringify(n))+'</code></div>';
   }
