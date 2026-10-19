@@ -151,6 +151,32 @@ try {
   assert.equal(dnsShellTest.object.collect.command,'Get-DnsServerZone | Select-Object ZoneName','changing interpreter must not convert command text');
   assert(dnsYaml.includes('SV-259345.automated'), 'Editing command must not alter the Assessment identity');
 
+  // A native Assessment-result reference should show the actual referenced Tests,
+  // while keeping the authored dependent source intact (no silent inlining).
+  await openRule('SV-257851');
+  await page.locator('[data-view="source"]').click();
+  const initialDependencySource=await page.locator('#rawyaml').inputValue();
+  const withReference=await page.evaluate(raw=>{
+    const parsed=window.jsyaml.load(raw);
+    parsed.assessment.evaluate={assessment:'SV-253254.automated'};
+    return window.jsyaml.dump(parsed);
+  },initialDependencySource);
+  await page.locator('#rawyaml').fill(withReference);
+  await page.locator('#applyYAML').click();
+  await page.locator('[data-view="graphical"]').click();
+  assert((await page.locator('.assessment-reference').innerText()).includes('SV-253254.automated'),
+    'a linked Assessment should be expanded in the logic tree');
+  assert((await page.locator('.assessment-reference').innerText()).includes('Enterprise'),
+    'referenced Windows EditionID Test conditions should appear without manual dereferencing');
+  assert.equal(await page.locator('.assessment-reference .linked-test').count(),1,
+    'resolved linked Test should be read-only, not silently merged into editable Tests');
+  await page.locator('[data-view="source"]').click();
+  assert((await page.locator('#rawyaml').inputValue()).includes('assessment: SV-253254.automated'),
+    'source should retain the Assessment reference, not inline its YAML automatically');
+  await page.locator('#rawyaml').fill(initialDependencySource);
+  await page.locator('#applyYAML').click();
+  await page.locator('[data-view="graphical"]').click();
+
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
   mobile.on('pageerror', err => jsErrors.push(err.message));
   await mobile.goto('http://127.0.0.1:8765/', { waitUntil: 'domcontentloaded' });
