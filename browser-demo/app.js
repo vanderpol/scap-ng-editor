@@ -962,6 +962,197 @@
       evaluate:{test:BANNER_TEST}
     }};
   }
+
+  const PROTECTION_STATES=[
+    ["owner_uid","Owner UID",0],
+    ["group_write","Group may write",false],
+    ["other_write","Others may write",false]
+  ];
+  function buildProtectedBannerAssessment(base,secondLine){
+    if(!secondLine||!secondLine.trim()||/[\r\n]/.test(secondLine))
+      throw Error("Enter a second nonempty required line.");
+    const a=base.assessment,firstKey=Object.keys(a.tests)[0],first=a.tests[firstKey];
+    const secondKey="rhel-login-banner-second-required-line-test";
+    const permissionsKey="rhel-login-banner-file-protection-test";
+    if(secondLine===first.states[0].text.equals)
+      throw Error("The second line must differ from the first; use the single-line check for one notice.");
+    const other=structuredClone(first);
+    other.test_title="Banner includes second required line";
+    other.object.object_title="Read second required banner line from "+first.object.select.full_path.equals;
+    other.object.select.pattern.matches_regex=linePattern(secondLine);
+    other.states[0].text.equals=secondLine;
+    const path=first.object.select.full_path.equals;
+    a.tests[secondKey]=other;
+    const fileStates=PROTECTION_STATES.map(([name,,value])=>({
+      [name]:{equals:value,require:"at_least_one_exists_and_all_match"}
+    }));
+    a.tests[permissionsKey]={
+      test_title:"Banner file is owned by root and not writable by group or others",
+      capability:"unix.file",
+      object:{capability:"unix.file",object_title:"Check ownership and write access to "+path,
+        select:{full_path:{equals:path}},filesystem:"local"},
+      states:fileStates,states_match:"all",
+      require:"at_least_one_exists_and_all_match",reported_elements:"all"
+    };
+    a.evaluate={all:[{test:firstKey},{test:secondKey},{test:permissionsKey}]};
+    return base;
+  }
+  function multiBannerParts(){
+    const a=doc()?.tree.assessment;
+    if(!a?.tests||!a.evaluate)return null;
+    const tests=Object.entries(a.tests);
+    const text=tests.filter(([,t])=>t?.capability==="independent.textfilecontent54");
+    const file=tests.filter(([,t])=>t?.capability==="unix.file");
+    if(text.length!==2||file.length!==1||tests.length!==3)return null;
+    if(!text.every(([,t])=>t?.object?.select?.full_path?.equals&&
+      typeof t?.states?.[0]?.text?.equals==="string")||
+      !file[0][1]?.object?.select?.full_path?.equals||
+      !Array.isArray(file[0][1].states))return null;
+    return {a,tests,text,file:file[0]};
+  }
+  function renameTestAndReferences(tree,oldId,newId){
+    if(!/^[a-z0-9]+(?:-[a-z0-9]+)*-test$/.test(newId))
+      throw Error("Test IDs must be lowercase hyphenated names ending in -test.");
+    const a=tree.assessment;
+    if(!Object.hasOwn(a.tests,oldId))throw Error("Original Test ID no longer exists.");
+    if(oldId===newId)return false;
+    if(Object.hasOwn(a.tests,newId))throw Error("That Test ID is already in use.");
+    const referenced=[];
+    const walkRefs=node=>{
+      if(!node||typeof node!=="object")return;
+      if(Array.isArray(node)){node.forEach(walkRefs);return}
+      if(typeof node.test==="string"&&node.test===oldId)referenced.push(node);
+      for(const [k,v] of Object.entries(node))if(k!=="test")walkRefs(v);
+    };
+    walkRefs(a.evaluate);
+    if(!referenced.length)throw Error("Test reference is not in the expression tree.");
+    a.tests=Object.fromEntries(Object.entries(a.tests).map(([name,val])=>[name===oldId?newId:name,val]));
+    referenced.forEach(x=>{x.test=newId});
+    return true;
+  }
+  function standaloneMultiWizard(){
+    const p=multiBannerParts();
+    if(!p)return '<section class="card"><h3>Custom source structure</h3><p>This Assessment no longer matches the three-check walkthrough. Use Source to inspect it without changing its original logic.</p></section>';
+    const {a,text,file,tests}=p;
+    const lineRows=text.map(([id,t],i)=>'<div class="property">'+
+      '<label for="multi-line-'+i+'">Required banner line '+(i+1)+'</label>'+
+      '<textarea id="multi-line-'+i+'" rows="3" data-multi-line="'+esc(id)+'" aria-label="Required banner line '+(i+1)+'">'+esc(t.states[0].text.equals)+'</textarea>'+
+      '</div>').join("");
+    const options=PROTECTION_STATES.map(([name,label])=>{
+      const index=file[1].states.findIndex(x=>x?.[name]?.equals!==undefined);
+      if(index<0)return '<p class="warning">Expected condition '+esc(name)+' is missing: review Source.</p>';
+      const val=file[1].states[index][name].equals;
+      const path=["assessment","tests",file[0],"states",index,name,"equals"];
+      return field(path,label,val,typeof val==="boolean"?["true","false"]:null);
+    }).join("");
+    const join=Array.isArray(a.evaluate?.all)?"all":Array.isArray(a.evaluate?.any)?"any":null;
+    const steps=["Goal and check names","Where to inspect","Expected conditions","Combine checks","Review"];
+    const nav='<div class="steps">'+steps.map((name,i)=>
+      '<button data-step="'+i+'" class="'+(step===i?"selected":"")+'">'+(i+1)+'. '+name+'</button>').join("")+'</div>';
+    let content="";
+    if(step===0)content='<section class="card"><h3>1 · Describe the security goal</h3>'+
+      field(["assessment","assessment_title"],"What should be secured?",a.assessment_title)+
+      field(["assessment","id"],"Assessment ID",a.id)+
+      '<h4>Checks derived from your goal</h4><p class="help">Every check has its own Test ID. Rename any Test without breaking its references.</p>'+
+      tests.map(([id,t],i)=>'<div class="property">'+
+        '<label>Check '+(i+1)+': '+esc(t.test_title)+'</label>'+
+        '<input type="text" data-rename-test="'+esc(id)+'" value="'+esc(id)+'" aria-label="Test ID for check '+(i+1)+'" spellcheck="false"></div>').join("")+'</section>';
+    if(step===1){
+      const filePath=text[0][1].object.select.full_path.equals;
+      content='<section class="card"><h3>2 · Where should each check look?</h3>'+
+        '<p><strong>One target file:</strong> all three checks inspect this same path, with independent collection results.</p>'+
+        '<label for="multi-path">File to inspect</label><input id="multi-path" value="'+esc(filePath)+'" type="text" spellcheck="false">'+
+        '<p class="help">Changing this field updates all three Object selectors together; source semantics are not silently merged.</p>'+
+        tests.map(([id,t],i)=>'<div class="property"><strong>Check '+(i+1)+'</strong> · '+esc(t.capability)+
+          '<p>'+esc(t.capability==="unix.file"?"Read file owner and permission fields":"Read the text in this file")+'</p></div>').join("")+
+        '</section>';
+    }
+    if(step===2)content='<section class="card"><h3>3 · What must be true?</h3>'+
+      '<h4>Two independent text searches</h4><p class="help">Each line has its own Test: finding one line does not prove the other line exists.</p>'+
+      lineRows+
+      '<h4>File owner and permissions</h4><p class="help">These three conditions apply to the SAME collected file Item, not three unrelated files.</p>'+
+      options+
+      field(["assessment","tests",file[0],"states_match"],"How should conditions on the same file combine?",file[1].states_match,["all","any"])+
+      '<p class="help">All = owner is root AND neither group nor others may write. Any would weaken this requirement.</p></section>';
+    if(step===3){
+      content='<section class="card"><h3>4 · How do the separate checks combine?</h3>'+
+        '<p>Each Test collects and evaluates its own evidence. No check assumes another one collected its result.</p>'+
+        '<label for="multi-logic">All three Tests must pass, or just one?</label>'+
+        '<select id="multi-logic" '+(join?"":"disabled")+'>'+
+        '<option value="all" '+(join==="all"?"selected":"")+'>All checks must pass (AND)</option>'+
+        '<option value="any" '+(join==="any"?"selected":"")+'>At least one check passes (OR)</option></select>'+
+        '<p class="help">For this stated requirement choose AND: both notices and the file protection are required. OR is editable to demonstrate how the native logic changes.</p>'+
+        '<h4>Review check structure</h4>'+tests.map(([id,t],i)=>'<p>'+(i+1)+'. '+esc(t.test_title)+' <code>'+esc(id)+'</code></p>').join("")+
+        '</section>';
+    }
+    if(step===4){
+      content='<section class="card"><h3>5 · Review all three checks</h3>'+
+        '<p><strong>2 capabilities, 3 Tests, 5 expected State predicates</strong></p>'+
+        '<p><strong>Tests:</strong> '+tests.map(([,t])=>esc(t.test_title)).join("; ")+'</p>'+
+        '<p><strong>File conditions:</strong> '+esc(file[1].states_match==="all"?"All three must match the same file":"At least one must match the same file")+'</p>'+
+        '<p><strong>Assessment logic:</strong> '+esc(join==="all"?"All three Tests must pass":"At least one Test may pass")+'</p>'+
+        '<p class="warning">Pre-alpha source draft — scanner and complete schema/semantic validation are not connected.</p>'+
+        '<details><summary>Inspect generated 0.4-A YAML</summary><pre>'+esc(doc().source)+'</pre></details></section>';
+    }
+    return nav+content+'<div class="actions">'+(step>0?'<button id="prev" class="button">Previous</button>':"")+
+      (step<4?'<button id="next" class="button primary">Next →</button>':'<button id="gotoSource" class="button primary">Review YAML Source</button>')+
+      '<button id="gotoGraph" class="button">Graphical overview</button></div>';
+  }
+  function bindMultiWizardEditors(){
+    if(!standaloneId||!multiBannerParts())return;
+    const mutate=(change,success)=>{
+      const d=doc(),original=structuredClone(d.tree);
+      try{
+        change(d.tree);
+        const raw=jsyaml.dump(d.tree,{lineWidth:105,noRefs:true});
+        parse(raw);
+        d.source=raw;d.changed=true;saveState();library();render();
+        display(success+" — draft only; review YAML.");
+      }catch(err){d.tree=original;display(err.message,true);render()}
+    };
+    const pathEditor=$("multi-path");
+    if(pathEditor)pathEditor.onchange=()=>{
+      const path=pathEditor.value.trim();
+      if(!path.startsWith("/")||path.length<2||/[\r\n]/.test(path)){display("Enter an absolute file path.",true);render();return}
+      mutate(tree=>{
+        for(const t of Object.values(tree.assessment.tests)){
+          if(t?.object?.select?.full_path?.equals!==undefined){
+            t.object.select.full_path.equals=path;
+            if(typeof t.object.object_title==="string")
+              t.object.object_title=t.object.object_title.replace(/\/etc\/issue(?:\.net)?/g,path);
+          }
+        }
+      },"Updated all three source file selectors");
+    };
+    $("content").querySelectorAll("[data-multi-line]").forEach(e=>e.onchange=()=>{
+      const id=e.dataset.multiLine,newLine=e.value;
+      if(!newLine.trim()||/[\r\n]/.test(newLine)){display("Each required notice must be one nonempty line.",true);render();return}
+      mutate(tree=>{
+        const t=tree.assessment.tests[id];
+        if(t?.capability!=="independent.textfilecontent54")throw Error("Text Test changed; use Source.");
+        t.states[0].text.equals=newLine;
+        t.object.select.pattern.matches_regex=linePattern(newLine);
+      },"Updated line and escaped text search together");
+    });
+    $("content").querySelectorAll("[data-rename-test]").forEach(e=>e.onchange=()=>{
+      const oldId=e.dataset.renameTest,newId=e.value.trim();
+      mutate(tree=>renameTestAndReferences(tree,oldId,newId),"Renamed Test ID and all expression references");
+    });
+    const logicSelector=$("multi-logic");
+    if(logicSelector)logicSelector.onchange=()=>{
+      const op=logicSelector.value;
+      if(!["all","any"].includes(op)){display("Unknown expression operator.",true);render();return}
+      if(!confirm("Change Assessment logic to "+op.toUpperCase()+"? This can change when the entire Assessment passes.")){render();return}
+      mutate(tree=>{
+        const old=tree.assessment.evaluate;
+        const leaves=old?.all||old?.any;
+        if(!Array.isArray(leaves)||leaves.length!==3||!leaves.every(x=>typeof x?.test==="string"))
+          throw Error("Complex logic tree changed; edit in Source.");
+        tree.assessment.evaluate={[op]:leaves};
+      },"Updated Assessment-level "+op.toUpperCase()+" expression");
+    };
+  }
+
   function renderStandaloneCreation(){
     $("crumb").textContent="MY ASSESSMENTS / NEW";$("title").textContent="New Assessment";
     $("state").textContent="Draft · no scanner";
