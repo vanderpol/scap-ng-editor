@@ -390,7 +390,8 @@
     states:"What the collected data must satisfy (States)",
     and:"All of these must be true (and)",
     or:"At least one of these must be true (or)",
-    record:"Structured value with named fields (record)"
+    record:"Structured value with named fields (record)",
+    canonical_path:"Resolved symlink destination"
   })[k]||String(k).replaceAll("_"," ");
   const requirementDescription = k => ({
     at_least_one_exists_and_all_match:"One or more must exist; all must match",
@@ -407,7 +408,7 @@
     const key=ops.find(k=>Object.hasOwn(node,k));
     if(!key)return "";
     const value=node[key];
-    return String(name)+" "+prettyName(key)+" "+(value&&typeof value==="object"?"a referenced value":String(value));
+    return prettyName(String(name))+" "+prettyName(key)+" "+(value&&typeof value==="object"?"a referenced value":String(value));
   }
   function summarizeCondition(n,depth=0){
     if(!n||typeof n!=="object"||depth>6)return "";
@@ -432,8 +433,18 @@
   function walk(o,path,heading,depth=0){
     if(depth>32)return '<p class="warning">Deep structure. Use Source to inspect further.</p>';
     if(Array.isArray(o)){
-      const name=heading==="filters"?"Filter":heading==="operands"?"Operand":heading==="and"?"Required condition":heading==="or"?"Alternative condition":heading==="states"||heading==="States"?"Condition (State)":heading==="concat"?"Part":"Item";
-      return o.map((v,i)=>walk(v,path.concat(i),name+" "+(i+1),depth+1)).join("");
+      const isStates=["states","States","State"].includes(heading);
+      const name=heading==="filters"?"Collection filter":heading==="operands"?"Collection source":heading==="and"?"Required condition":heading==="or"?"Alternative condition":isStates?"Expected condition":heading==="concat"?"Expression part":prettyName(heading)+" entry";
+      return o.map((v,i)=>{
+        // A single simple authored State is just one condition, not a
+        // collected Item. Show its predicate without a redundant array wrapper.
+        if(isStates&&o.length===1&&v&&typeof v==="object"&&!Array.isArray(v)&&Object.keys(v).length===1){
+          const [fieldName,condition]=Object.entries(v)[0];
+          if(condition&&typeof condition==="object"&&!Array.isArray(condition)&&shortClause(condition,fieldName))
+            return walk(condition,path.concat(i,fieldName),fieldName,depth+1);
+        }
+        return walk(v,path.concat(i),name+(o.length>1?" "+(i+1):""),depth+1);
+      }).join("");
     }
     if(o&&typeof o==="object"){
       const keys=Object.keys(o), clause=shortClause(o,heading);
@@ -448,7 +459,7 @@
           return shellInterpreterControl(path.concat(key),v,doc()?.tree.assessment?.specification?.version);
         return field(path.concat(key),prettyName(key),v,key==="require"||key==="collected_items_require"||key==="state_fields_require"?levels:key==="states_match"?["all","any","none","one"]:null);
       }).join("");
-      return '<details class="structure-node" '+(depth<2?"open":"")+'><summary>'+esc(groupSummary)+' <small>('+keys.length+' properties)</small></summary><div class="structure-children">'+children+'</div></details>';
+      return '<details class="structure-node" '+(depth<2?"open":"")+'><summary>'+esc(groupSummary)+'</summary><div class="structure-children">'+children+'</div></details>';
     }
     return field(path,prettyName(heading),o,null);
   }
