@@ -1844,13 +1844,14 @@
     if(!window.jsyaml){display("YAML parser asset did not load — app cannot parse files.",true);return}
     display("Loading six pinned source-backed Rule/Assessment examples from public GitHub…");
     const capabilityLoad=loadShellVocabulary();
+    const guidedLoad=loadGuidedMappings();
     const got=await Promise.all(seeded.map(async ([path])=>{
       try{const url=src+path;const res=await fetch(url,{cache:"force-cache"});if(!res.ok)throw Error("HTTP "+res.status);return {name:path.split("/").pop(),text:await res.text(),url,path}}
       catch(e){return {err:path+": "+e.message}}
     }));
     let failures=[];
     for(const item of got){if(item.err){failures.push(item.err);continue}try{addDoc(item.name,item.text,"Pinned source "+snap.slice(0,10),false,item.path)}catch(e){failures.push(item.name+": "+e.message)}}
-    await Promise.all([capabilityLoad,loadCompleteCatalog()]);
+    await Promise.all([capabilityLoad,guidedLoad,loadCompleteCatalog()]);
     readState();indexRules();chosen=null;expandedStig=null;library();render();
     display(catalogStatus+(failures.length?" Some sample fixtures unavailable: "+failures[0]:""),!!failures.length);
   }
