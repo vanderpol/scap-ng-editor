@@ -130,7 +130,7 @@
     return {ready:true,reason:""};
   }
   function safeCatalogPath(path){
-    return typeof path==="string"&&/^complete-stigs\/(?:authoring\/[a-z0-9_./-]+\.ya?ml|(?:rhel_9|ms_windows_11)\/index\.json|manifest\.json)$/.test(path)&&
+    return typeof path==="string"&&/^complete-stigs\/(?:authoring\/[A-Za-z0-9_./-]+\.ya?ml|(?:rhel_9|ms_windows_11)\/index\.json|manifest\.json)$/.test(path)&&
       !path.includes("..");
   }
   async function fetchCatalogText(path){
