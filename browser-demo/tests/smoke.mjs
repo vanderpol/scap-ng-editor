@@ -8,15 +8,36 @@ try {
   page.on('pageerror', err => jsErrors.push(err.message));
   await page.goto('http://127.0.0.1:8765/', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => document.querySelectorAll('.rule').length >= 6, { timeout: 45000 });
+  const groupFor={
+    'SV-257851':'rhel_9','SV-257889':'rhel_9',
+    'SV-253254':'ms_windows_11','SV-253495':'ms_windows_11',
+    'SV-214228':'apache_server_2-4_unix_server',
+    'SV-259345':'ms_windows_server_dns'
+  };
+  const openRule=async id=>{
+    const row=page.locator('[data-id="'+id+'"]');
+    if(!(await row.isVisible()))await page.locator('[data-stig="'+groupFor[id]+'"]').click();
+    await row.click();
+  };
+  assert.equal(await page.locator('.stig-toggle').count(),4,'the source-backed catalog should group six Rules into four STIGs');
+  for(const stig of ['rhel_9','ms_windows_11','apache_server_2-4_unix_server','ms_windows_server_dns'])
+    assert.equal(await page.locator('[data-stig="'+stig+'"]').count(),1,'STIG group '+stig+' should be present');
+  await page.locator('[data-filter="all"]').click();
+  assert.equal(await page.locator('.stig-toggle').count(),4,'All must show STIG headings, not a flat Rule list');
+  assert.equal(await page.locator('.stig-rules:not([hidden])').count(),0,'STIG Rules should be collapsed by default after All');
+  await page.locator('[data-stig="rhel_9"]').click();
+  assert((await page.locator('[data-id="SV-257851"]').innerText()).includes('Shared Assessment resolved'),
+    'shared RHEL automated Assessment must be resolved, not flagged non-automated');
+  await page.locator('[data-stig="rhel_9"]').click();
   const rules = await page.locator('.rid').allTextContents();
   for (const id of ['SV-257851','SV-253254','SV-253495','SV-257889','SV-259345','SV-214228']) {
     assert(rules.some(s => s.includes(id)), id+' source-backed fixture must load');
-    await page.locator('[data-id="'+id+'"]').click();
+    await openRule(id);
     assert(await page.locator('.logic-leaf').count() > 0, id+' should show linked Test logic');
     assert(await page.locator('#test-inspector').isVisible(), id+' must have a focused inspector');
   }
 
-  await page.locator('[data-id="SV-253495"]').click();
+  await openRule('SV-253495');
   assert((await page.locator('.logic-group').count()) >= 3, 'Windows OR tree must preserve nested AND branches');
   const guestRefs = page.locator('button.logic-leaf[data-select-test="deny-log-on-through-remote-desktop-services-guests-test"]');
   assert.equal(await guestRefs.count(), 2, 'Guests Test must visibly repeat as one referenced definition');
@@ -52,7 +73,7 @@ try {
   assert(await page.getByText('NOT CONNECTED', { exact: false }).isVisible(), 'sample panel must not imply a scanner');
   assert(await page.locator('.sample-mock button').isDisabled(), 'sample evaluation must remain disabled');
 
-  await page.locator('[data-id="SV-257851"]').click();
+  await openRule('SV-257851');
   assert((await page.locator('#test-inspector .combined-check').innerText()).includes('mounted filesystem entries'), 'simple collection should use a human term');
   assert((await page.locator('#test-inspector .combined-check').innerText()).includes('nosuid'), 'matching value and data source should be visible together');
   assert.equal(await page.locator('#test-inspector .inline-predicate input[data-field]').count(), 1, 'simple field value should have a direct edit control');
@@ -64,9 +85,9 @@ try {
   assert(editedLinux.includes('equals: noexec'), 'semantic editor must update the exact original field path');
   assert(editedLinux.includes('mount_point:'), 'source collection selector must remain present after a value change');
 
-  await page.locator('[data-id="SV-257889"]').click();
+  await openRule('SV-257889');
   assert(await page.getByText('Combine collected data (set)', { exact: false }).count() >= 1, 'Linux set/foreach structure should be visible');
-  await page.locator('[data-id="SV-214228"]').click();
+  await openRule('SV-214228');
   const apacheExpected=page.locator('#test-inspector .predicate-value');
   assert.equal(await apacheExpected.count(), 1, 'Apache KeepAlive regex should be editable at the condition itself');
   assert((await apacheExpected.inputValue()).includes('KeepAlive On'), 'original Apache pattern should be visibly displayed');
@@ -107,7 +128,7 @@ try {
   const apacheShellTest=apacheShellAssessment.assessment.tests['verify-that-keepalive-directive-defined-configured-on-in-httpd-conf-test'];
   assert.equal(apacheShellTest.object.collect.shell,'sh','shell selection must change collect.shell only');
   assert.equal(apacheShellTest.object.collect.command.variable,'shell-command-check-keepalive-in-httpd-conf-all-include-conf-variable','variable command reference must remain');
-  await page.locator('[data-id="SV-259345"]').click();
+  await openRule('SV-259345');
   assert((await page.locator('.logic-group').count()) >= 2, 'DNS has nested alternatives');
   const dnsCommand=page.locator('#test-inspector .shellcommand-panel textarea[data-field]');
   assert.equal(await dnsCommand.count(), 1, 'Literal PowerShell command must be immediately visible in Test inspector');
@@ -134,6 +155,7 @@ try {
   mobile.on('pageerror', err => jsErrors.push(err.message));
   await mobile.goto('http://127.0.0.1:8765/', { waitUntil: 'domcontentloaded' });
   await mobile.waitForFunction(() => document.querySelectorAll('.rule').length >= 6, { timeout: 45000 });
+  await mobile.locator('[data-stig="rhel_9"]').click();
   await mobile.locator('[data-id="SV-257851"]').click();
   assert(await mobile.getByText('Assessment logic', { exact: false }).isVisible(), 'phone graphical view is reachable');
   assert.deepEqual(jsErrors, [], 'No browser JavaScript exceptions');
