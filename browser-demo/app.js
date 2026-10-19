@@ -661,6 +661,41 @@
       ''+
       '</div>';
   }
+  // The most common native record case (e.g., Get-Tpm) can be edited as a
+  // compact field matrix while the original State/record nesting stays intact.
+  function recordFieldEditor(id,t){
+    if(!Array.isArray(t.states)||t.states.length!==1)return "";
+    const state=t.states[0];
+    if(!state||typeof state!=="object"||Array.isArray(state)||Object.keys(state).length!==1)return "";
+    const [entry,wrapper]=Object.entries(state)[0];
+    const record=wrapper?.record,fields=record?.fields;
+    if(!fields||typeof fields!=="object"||Array.isArray(fields))return "";
+    const comparisons=["equals","case_insensitive_equals","matches_regex","greater_than_or_equal","less_than_or_equal","greater_than","less_than"];
+    const operations={equals:"Equals",case_insensitive_equals:"Equals (ignore case)",matches_regex:"Matches regex",greater_than_or_equal:"At least",less_than_or_equal:"At most",greater_than:"Greater than",less_than:"Less than"};
+    const rendered=Object.entries(fields).map(([name,m])=>{
+      if(!m||typeof m!=="object"||Array.isArray(m))return '<p class="warning">'+esc(name)+': complex field; see full details.</p>';
+      const found=comparisons.filter(op=>Object.hasOwn(m,op));
+      if(found.length!==1||typeof m[found[0]]==="object"||typeof m[found[0]]==="boolean")
+        return '<p class="warning">'+esc(name)+': use full details for this comparison.</p>';
+      const op=found[0],value=m[op],base=["assessment","tests",id,"states",0,entry,"record","fields",name];
+      const allowed=typeof value==="number"?["equals","greater_than","greater_than_or_equal","less_than","less_than_or_equal"]:
+        ["equals","case_insensitive_equals","matches_regex"];
+      if(!allowed.includes(op))allowed.unshift(op);
+      const opOptions=allowed.map(x=>'<option value="'+esc(x)+'" '+(x===op?"selected":"")+'>'+esc(operations[x]||x)+'</option>').join("");
+      const opAttr=encodeURIComponent(JSON.stringify(base));
+      const valAttr=encodeURIComponent(JSON.stringify(base.concat(op)));
+      return '<div class="record-edit-row">'+
+        '<div><label>Field</label><code>'+esc(name)+'</code></div>'+
+        '<div><label>Must</label><select data-operation="'+opAttr+'" aria-label="Comparison for '+esc(name)+'">'+opOptions+'</select></div>'+
+        '<div><label>Value</label><input type="text" data-field="'+valAttr+'" value="'+esc(String(value))+'" aria-label="Expected value for '+esc(name)+'"></div>'+
+        (m.require?'<div class="record-require"><label>Values required</label>'+requirementSelect(base.concat("require"),m.require,"Field requirement")+'</div>':"")+
+        '</div>';
+    });
+    return '<div class="inline-predicate record-editor"><div class="predicate-heading">Check these fields (record)</div>'+
+      '<div class="record-fields">'+rendered.join("")+'</div>'+
+      (record.require?'<p class="help">Record requirement: '+esc(requirementDescription(record.require))+'</p>':"")+
+      '</div>';
+  }
   // Applies at the Test's collected-Item population, not to State fields.
   // Never use these English sentences as substitute serialized schema values.
   function resultCountExplanation(requirement){
@@ -735,7 +770,7 @@
       '<h4>What this check means</h4>'+
       '<p class="check-sentence"><strong>Look at</strong> '+esc(from.text)+'. <small>'+esc(from.detail)+'</small></p>'+
       shellCommandDetails(a,id,t)+
-      (shape?oneFieldEditor(id,t):
+      (shape?oneFieldEditor(id,t):recordFieldEditor(id,t)||
         '<div class="condition-readonly"><strong>Conditions (States)</strong><p>'+esc(summarizeTest(t))+'</p><p class="help">Open full details to edit nested conditions.</p></div>')+
       '<div class="quick-results"><label>How many results must be found and match? (collected_items_require)</label>'+
       requirementSelect(["assessment","tests",id,"collected_items_require"],t.collected_items_require,"Results that must be found and match")+
