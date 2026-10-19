@@ -10,6 +10,13 @@
 
 > **The shared contract for ChatGPT, Codex, and human contributors.** Read this file and root `AGENTS.md` before beginning development. Commit updates to this file alongside meaningful implementation milestones. The **repository** is the communication medium; chat prompts are not the durable project specification. This file is not an autonomous job queue or a signal that a task is running.
 
+## Desktop-first responsive usability checkpoint — 19 October 2026
+
+- **Owner test context:** So far all hands-on usability feedback came from a phone. The target assessment editor is desktop Chrome/Chromebook, where markedly more relevant fields and logic should be visible on one page. Do not equate phone stacking with desktop layout.
+- **Existing Graphical desktop baseline:** Outer STIG/My Assessments navigation plus left `evaluate` logic tree (`.logic-pane`) and right contextual Test inspector (`#test-inspector`); CSS stacks Graphical panes below 1040px and global navigation below 720px. This is a provisional tree-left layout, *not* a final UX signoff.
+- **Regression evidence:** [Chrome smoke PASS](https://github.com/vanderpol/scap-ng-editor/actions/runs/39238356637) verifies side-by-side Graphical panels at 1366×768 and 1920×1080 with no horizontal document overflow, stacked Graphical panes at 1024×768, plus existing 390×844 phone smoke. [Desktop comparison and human-review gate #10](https://github.com/vanderpol/scap-ng-editor/issues/10) remains open: screenshot/zoom testing, information density, tree+inspector selection, and whether a collapsible/resizable third navigation column improves the experience. No major structural commitment before the owner tests it on desktop.
+- **Scope:** Finish the generic Guided-mode workflow first. Desktop refinement should not alter 0.4-A schema semantics or misrepresent parser-only validation as scanner correctness.
+
 ## Guided standalone authoring milestone — 19 October 2026
 
 - **Tested core multi-check slice [#14](https://github.com/vanderpol/scap-ng-editor/issues/14):** `My Assessments → New Assessment` can create a standalone RHEL login-banner+permissions draft with **3 Tests / 2 capabilities / 5 State predicates**: two separately collected `independent.textfilecontent54` text-line Tests, plus one `unix.file` Test with root owner and forbidden group/other write fields (three States combined `states_match: all`). The Assessment combines all three named Tests with `evaluate.all` (editable to `any` with warning); Test ID edits atomically update expression leaf references. Text and file path changes update appropriate multiple source paths. One-check banner pilot also remains available.
