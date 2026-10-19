@@ -24,7 +24,82 @@ try {
   assert.equal(await page.locator('.stig-toggle').count(),4,'the source-backed catalog should group six Rules into four STIGs');
   for(const stig of ['rhel_9','ms_windows_11','apache_server_2-4_unix_server','ms_windows_server_dns'])
     assert.equal(await page.locator('[data-stig="'+stig+'"]').count(),1,'STIG group '+stig+' should be present');
+  // Blank, goal-first authoring must NOT prepopulate RHEL banner Test data.
+  // Compose two independent Tests with capability-specific fields and two
+  // same-file State conditions, then roundtrip through native 0.4-A YAML.
   await page.locator('#new-assessment').click();
+  assert(await page.locator('#blank-create').isVisible(),'new default must be blank goal-first');
+  assert.equal(await page.locator('#blank-goal').inputValue(),'',
+    'the security goal must not prepopulate a RHEL example');
+  assert.equal(await page.locator('#blank-id').inputValue(),'');
+  await page.locator('#blank-goal').fill('The audit log must be owned by root and not writable by others');
+  assert((await page.locator('#blank-id').inputValue()).startsWith('custom.the-audit-log'),
+    'a meaningful editable Assessment ID should derive from the goal');
+  await page.locator('#blank-create button[type="submit"]').click();
+  assert((await page.locator('#content').innerText()).includes('Incomplete draft: no Tests yet'),
+    'blank Assessment must not invent a pass/fail test or fake not_applicable');
+  const genericCaps=await page.locator('#generic-capability option').allTextContents();
+  assert.equal(genericCaps.length,2,'Guided supports two pinned capability-native creation prompts');
+  await page.locator('#generic-check-title').fill('Audit log owned by root');
+  assert.equal(await page.locator('#generic-check-id').inputValue(),'audit-log-owned-by-root-test');
+  await page.locator('#generic-capability').selectOption('unix.file');
+  await page.locator('#generic-path').fill('/var/log/audit/audit.log');
+  await page.locator('#generic-field').selectOption('owner_uid');
+  await page.locator('#generic-value').fill('0');
+  await page.locator('#generic-add-test button[type="submit"]').click();
+  assert.equal(await page.locator('.generic-check').count(),1);
+  const addState=page.locator('.generic-add-state').first();
+  await addState.locator('[data-generic-field-for]').selectOption('other_write');
+  assert.equal(await addState.locator('#generic-value').inputValue(),'false',
+    'file Boolean fields should use true/false dropdowns from pinned type vocabulary');
+  await addState.locator('button[type="submit"]').click();
+  assert.equal(await page.locator('.generic-state-row').count(),2,
+    'multiple States must be editable against the same unix.file Item');
+  await page.locator('#generic-check-title').fill('Required security notice appears in issue');
+  await page.locator('#generic-capability').selectOption('independent.textfilecontent54');
+  await page.locator('#generic-path').fill('/etc/issue');
+  await page.locator('#generic-line').fill('Authorized use only (test).');
+  await page.locator('#generic-add-test button[type="submit"]').click();
+  assert.equal(await page.locator('.generic-check').count(),2,
+    'checks using two different capabilities can coexist');
+  const rename=page.locator('[data-generic-rename]').last();
+  await rename.fill('issue-required-security-notice-test');
+  await rename.press('Tab');
+  assert.equal(await page.locator('#generic-logic').inputValue(),'all');
+  page.once('dialog',dialog=>dialog.accept());
+  await page.locator('#generic-logic').selectOption('any');
+  await page.locator('[data-view="source"]').click();
+  const genericYaml=await page.locator('#rawyaml').inputValue();
+  const generic=await page.evaluate(raw=>window.jsyaml.load(raw),genericYaml);
+  const ga=generic.assessment,gt=ga.tests;
+  assert.equal(ga.assessment_title,'The audit log must be owned by root and not writable by others');
+  assert.equal(Object.keys(gt).length,2);
+  assert.deepEqual(ga.evaluate.any.map(x=>x.test),Object.keys(gt),
+    'AND/OR and Test rename must preserve exact check references');
+  const owner=gt['audit-log-owned-by-root-test'];
+  assert.equal(owner.capability,'unix.file');
+  assert.equal(owner.object.select.full_path.equals,'/var/log/audit/audit.log');
+  assert.equal(owner.states_match,'all');
+  assert.deepEqual(owner.states.map(x=>Object.values(x)[0].equals),[0,false]);
+  assert.equal(gt['issue-required-security-notice-test'].capability,'independent.textfilecontent54');
+  assert.equal(gt['issue-required-security-notice-test'].states[0].text.equals,'Authorized use only (test).');
+  assert(gt['issue-required-security-notice-test'].object.select.pattern.matches_regex.includes('\\('),
+    'literal punctuation must be escaped in the object selector regex');
+  await page.locator('[data-view="guided"]').click();
+  assert.equal(await page.locator('.generic-check').count(),2,
+    'new draft must roundtrip back from YAML to Guided');
+  page.once('dialog',dialog=>dialog.accept());
+  await page.locator('[data-generic-remove-test="issue-required-security-notice-test"]').click();
+  await page.locator('[data-view="source"]').click();
+  const afterRemoval=await page.evaluate(raw=>window.jsyaml.load(raw),await page.locator('#rawyaml').inputValue());
+  assert.deepEqual(Object.keys(afterRemoval.assessment.tests),['audit-log-owned-by-root-test']);
+  assert.equal(afterRemoval.assessment.evaluate.test,'audit-log-owned-by-root-test',
+    'removing one Test must collapse the expression without dangling references');
+
+  // Original RHEL walkthrough remains optional and separate from blank flow.
+  await page.locator('#new-assessment').click();
+  await page.locator('#try-example').click();
+  assert(await page.locator('#standalone-create').isVisible(),'RHEL example remains explicitly opt-in');
   assert(await page.locator('#standalone-create').isVisible(),'standalone creation must not require a STIG');
   assert.deepEqual(await page.locator('#create-capability option:not([disabled])').allTextContents(),
     ['Read and match text in a file — independent.textfilecontent54'],
