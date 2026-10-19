@@ -1567,12 +1567,22 @@
         '<p class="help">Detailed edits remain available through Source; no hidden semantic changes are applied.</p></details></section>';
     }).join("");
     const addDisabled=capabilities.length===0||capabilities.length!==(GUIDED_PLATFORM_CAPS[platform]?.length||0);
+    // Local editor metadata is NOT authored SCAP-NG YAML. Old exports and
+    // browser drafts may have lost this field. Let authors explicitly restore
+    // a compatible choice without modifying any existing source semantics.
+    const platformsMatchingChecks=Object.keys(GUIDED_PLATFORM_CAPS).filter(p=>
+      entries.every(([,t])=>guidedAllowedCapability(p,t.capability)));
+    const mayChoosePlatform=!entries.length||(!platform&&platformsMatchingChecks.length>0);
     return '<section class="card"><h3>Guided Assessment — started from your goal</h3>'+
       '<label for="generic-platform">'+esc(guidedTerm("authoring.target_platform","Target platform"))+'</label>'+
-      '<select id="generic-platform" '+(entries.length?"disabled":"")+'>'+
+      '<select id="generic-platform" '+(mayChoosePlatform?"":"disabled")+'>'+
       '<option value="" '+(!platform?"selected":"")+' disabled>Choose platform</option>'+
-      ["linux","windows"].map(p=>'<option value="'+p+'" '+(platform===p?"selected":"")+'>'+esc(guidedPlatformLabel(p))+'</option>').join("")+'</select>'+
-      '<p class="help">'+(entries.length?"Platform is locked while checks exist. Remove all Tests or create a separate Assessment to switch platforms.": "Change the platform before adding your first check.")+'</p>'+
+      (entries.length?platformsMatchingChecks:["linux","windows"]).map(p=>
+        '<option value="'+p+'" '+(platform===p?"selected":"")+'>'+esc(guidedPlatformLabel(p))+'</option>').join("")+'</select>'+
+      '<p class="help">'+(entries.length?
+        (platform?"Platform is locked while checks exist. Remove all Tests or create a separate Assessment to switch platforms.":
+         "This older draft has no platform metadata. Choose a platform compatible with every existing Test to restore Guided editing. Your YAML will not change.") :
+        "Change the platform before adding your first check.")+'</p>'+
       field(["assessment","assessment_title"],guidedTerm("assessment.assessment_title","Security requirement"),a.assessment_title)+
       field(["assessment","id"],"Assessment ID",a.id)+
       '<p class="help">Not tied to any STIG. The editor will not invent collection results or a scanner verdict.</p>'+
@@ -1628,8 +1638,12 @@
     if(platformInput)platformInput.onchange=()=>{
       const selected=platformInput.value;
       if(!Object.hasOwn(GUIDED_PLATFORM_CAPS,selected)){display("Unsupported target platform",true);render();return;}
-      if(Object.keys(d.tree.assessment.tests||{}).length){
-        display("Remove all Tests or create another Assessment before switching platforms.",true);render();return;
+      const tests=Object.values(d.tree.assessment.tests||{});
+      if(tests.length&&(d.guidedPlatform||!tests.every(t=>guidedAllowedCapability(selected,t.capability)))){
+        display("Platform change refused: existing Tests are locked or incompatible.",true);render();return;
+      }
+      if(tests.length&&!confirm("Associate this old draft with "+guidedPlatformLabel(selected)+" for editing? Its Assessment YAML will remain unchanged.")){
+        render();return;
       }
       d.guidedPlatform=selected;d.changed=true;saveState();render();
       display("Target platform changed to "+guidedPlatformLabel(selected)+"; no Assessment YAML or Test semantics changed.");
