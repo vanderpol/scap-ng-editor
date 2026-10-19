@@ -1278,6 +1278,69 @@
     return t.capability==="windows.registry"?t.object?.select?.key?.equals:
       t.object?.select?.full_path?.equals;
   }
+
+  // A deliberately bounded native evaluate editor. Only AND/OR groups and
+  // Test leaves are editable here; conditional/NOT/Assessment references stay
+  // visible in Source instead of being rewritten to a simpler meaning.
+  function guidedExpressionLeaves(node,depth=0){
+    if(!node)return [];
+    if(!node||typeof node!=="object"||Array.isArray(node)||depth>16)
+      throw Error("Unsupported or excessively nested expression.");
+    const keys=Object.keys(node);
+    if(keys.length!==1)throw Error("Unexpected expression keys.");
+    if(keys[0]==="test"){
+      if(typeof node.test!=="string")throw Error("Invalid Test reference.");
+      return [node.test];
+    }
+    const op=keys[0],children=node[op];
+    if(!["all","any"].includes(op)||!Array.isArray(children)||children.length<2)
+      throw Error("Only AND/OR groups with two or more branches can be edited in Guided mode.");
+    return children.flatMap(child=>guidedExpressionLeaves(child,depth+1));
+  }
+  function guidedGroupAt(root,path){
+    let at=root;
+    for(const index of path){
+      const kids=at?.all||at?.any;
+      if(!Array.isArray(kids)||!Number.isInteger(index)||index<0||index>=kids.length)
+        throw Error("Group location changed; reopen Guided.");
+      at=kids[index];
+    }
+    if(!Array.isArray(at?.all)&&!Array.isArray(at?.any))
+      throw Error("Selected expression is not an AND/OR group.");
+    return at;
+  }
+  function guidedRemoveLeaf(node,id){
+    if(node?.test)return node.test===id?null:node;
+    const op=node?.all?"all":node?.any?"any":null;
+    if(!op)throw Error("Unsupported expression while unlinking.");
+    const children=node[op].map(x=>guidedRemoveLeaf(x,id)).filter(Boolean);
+    return children.length===0?null:children.length===1?children[0]:{[op]:children};
+  }
+  function genericLogicOutline(a,node,path=[],depth=0){
+    if(depth>16)return '<p class="warning">Expression nesting limit reached.</p>';
+    if(node?.test)return '<div class="logic-leaf">'+
+      '<strong>'+esc(a.tests[node.test]?.test_title||node.test)+'</strong>'+
+      '<small>'+esc(node.test)+'</small></div>';
+    const op=node?.all?"all":node?.any?"any":null;
+    if(!op)return '<p class="warning">Unsupported expression; edit in Source.</p>';
+    const kids=node[op],encoded=encodeURIComponent(JSON.stringify(path));
+    const positions=kids.flatMap((n,i)=>i<kids.length-1&&n?.test&&kids[i+1]?.test?
+      [{i,label:(a.tests[n.test]?.test_title||n.test)+" + "+(a.tests[kids[i+1].test]?.test_title||kids[i+1].test)}]:[]);
+    return '<div class="logic-group generic-logic-node"><div class="generic-logic-heading">'+
+      '<strong>'+(op==="all"?"AND — every branch required":"OR — any branch may succeed")+'</strong>'+
+      (depth>0?'<label>Join these branches: <select data-generic-group-op="'+encoded+'">'+
+        '<option value="all" '+(op==="all"?"selected":"")+'>AND</option>'+
+        '<option value="any" '+(op==="any"?"selected":"")+'>OR</option></select></label>':"")+
+      '</div><div class="logic-children">'+
+      kids.map((c,i)=>genericLogicOutline(a,c,path.concat(i),depth+1)).join("")+
+      (positions.length?'<div class="generic-logic-pair"><label>Group adjacent independent checks</label>'+
+        '<select data-generic-pair="'+encoded+'">'+
+        positions.map(p=>'<option value="'+p.i+'">'+esc(p.label)+'</option>').join("")+'</select>'+
+        '<button type="button" class="button" data-generic-nest="'+encoded+'">Create nested OR group</button>'+
+        '</div>':"")+
+      '</div></div>';
+  }
+
   function genericNewTest(a,{title,id,capability,path,line,field,value,hive,registryName}){
     if(!title.trim()||!/^[a-z0-9]+(?:-[a-z0-9]+)*-test$/.test(id))
       throw Error("Enter a check description and lowercase Test ID ending -test.");
@@ -1316,8 +1379,7 @@
         require:"at_least_one_exists_and_all_match",reported_elements:"all"};
     }else throw Error("Capability not implemented.");
     const old=a.evaluate;
-    if(old&&!old.test&&!Array.isArray(old.all)&&!Array.isArray(old.any))
-      throw Error("Nested/advanced expression must be edited in Source.");
+    if(old)guidedExpressionLeaves(old);
     if(old?.test&&!a.tests[old.test])throw Error("Existing Test reference is unresolved.");
     a.tests[id]=t;
     if(!old)a.evaluate={test:id};
@@ -1333,9 +1395,11 @@
            Object.keys(state).every(key=>genericSupportedField(t.capability,key)))&&
          (t.states.length<2||["all","any","one","odd"].includes(t.states_match))
        ))return false;
-    const leaves=a.evaluate?.all||a.evaluate?.any||(a.evaluate?.test?[a.evaluate]:[]);
-    return leaves.length===entries.length&&leaves.every(x=>x&&typeof x.test==="string"&&a.tests[x.test])&&
-      new Set(leaves.map(x=>x.test)).size===leaves.length;
+    try{
+      const leaves=guidedExpressionLeaves(a.evaluate);
+      return leaves.length===entries.length&&leaves.every(id=>!!a.tests[id])&&
+        new Set(leaves).size===leaves.length;
+    }catch{return false}
   }
   function genericChange(modify,success){
     const d=doc(),before=structuredClone(d.tree);
@@ -1417,7 +1481,8 @@
         '<select id="generic-logic" aria-label="Combine independent Tests">'+
         '<option value="all" '+(op==="all"?"selected":"")+'>ALL checks must succeed (AND)</option>'+
         '<option value="any" '+(op==="any"?"selected":"")+'>ANY check may succeed (OR)</option></select>'+
-        '<p class="help">This changes the Assessment expression, not which expected fields belong to each Test.</p></section>':"")+
+        '<p class="help">This changes the Assessment expression, not which expected fields belong to each Test.</p>'+
+        '<h4>Assessment logic tree</h4>'+genericLogicOutline(a,a.evaluate)+'</section>':"")+
       testRows+
       '<section class="card"><h3>+ Add an independent check</h3>'+
       (addDisabled?'<p class="warning">'+esc(guidedMapError)+'</p>':'<p class="help">Select a source capability, then describe the expected field or required text.</p>')+
@@ -1578,21 +1643,42 @@
       const id=e.dataset.genericRemoveTest;
       if(!confirm("Delete this Test and unlink it from the Assessment expression?"))return;
       genericChange(a=>{
-        const old=a.evaluate,leaves=old?.all||old?.any||(old?.test?[old]:[]);
-        if(!leaves.some(x=>x.test===id))throw Error("Test is not referenced; review source.");
-        const next=leaves.filter(x=>x.test!==id);
+        if(!guidedExpressionLeaves(a.evaluate).includes(id))
+          throw Error("Test is not referenced; review Source.");
+        const next=guidedRemoveLeaf(a.evaluate,id);
         delete a.tests[id];
-        if(!next.length)delete a.evaluate;
-        else if(next.length===1)a.evaluate=next[0];
-        else a.evaluate={[old.any?"any":"all"]:next};
+        if(next)a.evaluate=next;
+        else delete a.evaluate;
       },"Removed Test and repaired Assessment-level references");
+    });
+    $("content").querySelectorAll("[data-generic-nest]").forEach(b=>b.onclick=()=>{
+      const path=JSON.parse(decodeURIComponent(b.dataset.genericNest));
+      const selector=$("content").querySelector('[data-generic-pair="'+b.dataset.genericNest+'"]');
+      const index=Number(selector?.value);
+      if(!Number.isInteger(index))return;
+      genericChange(a=>{
+        const group=guidedGroupAt(a.evaluate,path),op=group.all?"all":"any",children=group[op];
+        if(!children[index]?.test||!children[index+1]?.test)throw Error("Choose adjacent Test leaves to group.");
+        const pair=children.slice(index,index+2);
+        children.splice(index,2,{any:pair});
+      },"Created a nested OR group with two adjacent Tests");
+    });
+    $("content").querySelectorAll("[data-generic-group-op]").forEach(e=>e.onchange=()=>{
+      const path=JSON.parse(decodeURIComponent(e.dataset.genericGroupOp)),op=e.value;
+      if(!["all","any"].includes(op)){render();return}
+      if(!confirm("Change this nested group's logic to "+op.toUpperCase()+"? This changes assessment meaning.")){render();return}
+      genericChange(a=>{
+        const group=guidedGroupAt(a.evaluate,path);
+        const children=group.all||group.any;
+        delete group.all;delete group.any;group[op]=children;
+      },"Changed nested branch operator");
     });
     const combo=$("generic-logic");
     if(combo)combo.onchange=()=>{
       if(!confirm("Change Assessment check logic to "+combo.value.toUpperCase()+"? The overall result can change.")){render();return}
       genericChange(a=>{
         const old=a.evaluate,leaves=old?.all||old?.any;
-        if(!Array.isArray(leaves)||leaves.length<2)throw Error("Expected a flat multi-Test expression.");
+        if(!Array.isArray(leaves)||leaves.length<2)throw Error("Expected a root AND/OR group.");
         a.evaluate={[combo.value]:leaves};
       },"Changed Assessment AND/OR logic");
     };
