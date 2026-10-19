@@ -1153,6 +1153,168 @@
     };
   }
 
+
+  // Guided authoring field lists are loaded from immutable SCAP-NG mappings.
+  const guidedMaps=new Map();
+  let guidedMapError="Capability mappings not loaded.";
+  async function loadGuidedMappings(){
+    const c=window.SCAPNG_GUIDED_MAPPINGS;
+    if(!c?.repository||!/^[0-9a-f]{40}$/.test(c.revision)||
+       c.specificationVersion!=="0.4.0"||!Array.isArray(c.capabilities))return;
+    try{
+      const loaded=await Promise.all(c.capabilities.map(async capability=>{
+        if(!["independent.textfilecontent54","unix.file"].includes(capability))throw Error("Unsupported capability "+capability);
+        const url="https://raw.githubusercontent.com/"+c.repository+"/"+c.revision+
+          "/schema/v0.4.0/capability-mappings/supported/"+capability+".json";
+        const res=await fetch(url,{cache:"force-cache"});
+        if(!res.ok)throw Error("Mapping HTTP "+res.status);
+        const m=await res.json();
+        if(m.capability!==capability||m.specification_version!==c.specificationVersion||
+           !m.native?.state_field_map||!m.native?.field_datatypes||
+           !Array.isArray(m.native?.object_selector_alternatives))
+          throw Error("Mismatched or incomplete mapping");
+        return [capability,m];
+      }));
+      guidedMaps.clear();loaded.forEach(([key,value])=>guidedMaps.set(key,value));guidedMapError="";
+    }catch(err){guidedMaps.clear();guidedMapError="Pinned mapping unavailable: "+err.message}
+    if(creatingStandalone||doc()?.guidedGeneric)render();
+  }
+  const assessmentIdValid=id=>/^[a-z0-9]+(?:[a-z0-9.-]*[a-z0-9])?$/.test(id);
+  function suggestId(value,suffix=""){
+    const slug=String(value||"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,78).replace(/-+$/,"");
+    return (slug||"new-check")+suffix;
+  }
+  function renderBlankCreation(){
+    $("crumb").textContent="MY ASSESSMENTS / NEW";
+    $("title").textContent="New Assessment — start from your goal";
+    $("state").textContent="Incomplete draft · no scanner";
+    $("notice").textContent="Start blank. Nothing is linked to a STIG or prefilled from a RHEL example.";
+    $("content").innerHTML='<section class="card"><h3>What security requirement do you want to check?</h3>'+
+      '<p>Describe your goal. Then build independent checks using supported capabilities.</p>'+
+      '<form id="blank-create" class="standalone-create">'+
+      '<label for="blank-goal">Security requirement</label>'+
+      '<textarea name="goal" id="blank-goal" required rows="3" placeholder="Example: Audit logs must be owned by root and not writable by other users"></textarea>'+
+      '<label for="blank-id">Suggested Assessment ID (editable)</label>'+
+      '<input id="blank-id" name="id" required spellcheck="false" placeholder="custom.audit-log-protection">'+
+      '<p class="help">This local draft begins with no Tests and is incomplete until you add at least one.</p>'+
+      '<button class="button primary" type="submit">Create blank Assessment →</button>'+
+      '<p id="blank-error" class="warning" role="alert"></p></form>'+
+      '<hr><p class="help">Prefer the original walkthrough?</p>'+
+      '<button type="button" class="button" id="try-example">Open RHEL banner example</button></section>';
+    const goal=$("blank-goal"),id=$("blank-id");
+    let manual=false;
+    id.oninput=()=>{manual=true};
+    goal.oninput=()=>{if(!manual)id.value="custom."+suggestId(goal.value)};
+    $("try-example").onclick=()=>{newCreateMode="example";render()};
+    $("blank-create").onsubmit=e=>{
+      e.preventDefault();
+      try{
+        const title=goal.value.trim(),identity=id.value.trim();
+        if(!title)throw Error("Enter a security requirement.");
+        if(!assessmentIdValid(identity))throw Error("Use a lowercase Assessment ID (letters, digits, periods or hyphens).");
+        if(docs.has("assessment:"+identity))throw Error("Assessment ID already exists.");
+        const tree={assessment:{
+          id:identity,version:1,assessment_title:title,mode:"automated",
+          class:"compliance",purpose:"assessment",
+          specification:{id:"scap-ng.pre-alpha.assessment",version:"0.4.0"},tests:{}
+        }};
+        const raw=jsyaml.dump(tree,{lineWidth:105,noRefs:true}),p=parse(raw);
+        const key=addDoc(p.id+".assessment.yaml",raw,"Locally created draft");
+        docs.get(key).guidedGeneric=true;docs.get(key).changed=true;
+        standaloneId=p.id;chosen=null;creatingStandalone=false;step=0;view="guided";
+        saveState();library();render();
+        display("Blank Assessment created. Add a first Test before exporting.");
+      }catch(err){$("blank-error").textContent=err.message;display(err.message,true)}
+    };
+  }
+  const genericSupportedField=(capability,field)=>{
+    const map=guidedMaps.get(capability);
+    if(!map||!Object.values(map.native.state_field_map).includes(field))return null;
+    const types=map.native.field_datatypes[field]||[];
+    return types.includes("boolean")?"boolean":types.includes("integer")?"integer":
+      types.includes("string")?"string":null;
+  };
+  const genericFileFields=()=>{
+    const map=guidedMaps.get("unix.file");
+    if(!map)return [];
+    return [...new Set(Object.values(map.native.state_field_map))].filter(name=>genericSupportedField("unix.file",name));
+  };
+  function genericFieldOptions(selected){
+    return genericFileFields().map(name=>'<option value="'+esc(name)+'" '+(selected===name?"selected":"")+'>'+esc(name.replaceAll("_"," "))+'</option>').join("");
+  }
+  function genericValue(type,value){
+    if(type==="boolean")return '<select id="generic-value">'+
+      ["false","true"].map(x=>'<option value="'+x+'" '+(String(value)===x?"selected":"")+'>'+x+'</option>').join("")+'</select>';
+    return '<input id="generic-value" type="'+(type==="integer"?"number":"text")+'" value="'+esc(value??(type==="integer"?0:""))+'" '+(type==="integer"?'step="1"':"")+' required>';
+  }
+  function genericTypedValue(field,raw,capability="unix.file"){
+    const type=genericSupportedField(capability,field);
+    if(!type)throw Error("Field "+field+" is unsupported by the pinned "+capability+" mapping.");
+    if(type==="boolean"){
+      if(!["true","false"].includes(String(raw)))throw Error("Expected true or false.");
+      return String(raw)==="true";
+    }
+    if(type==="integer"){
+      if(!/^-?\d+$/.test(String(raw))||!Number.isSafeInteger(Number(raw)))
+        throw Error("Enter a safe whole number.");
+      return Number(raw);
+    }
+    if(!String(raw).trim())throw Error("Enter an expected value.");
+    return String(raw);
+  }
+  function genericNewTest(a,{title,id,capability,path,line,field,value}){
+    if(!title.trim()||!/^[a-z0-9]+(?:-[a-z0-9]+)*-test$/.test(id))
+      throw Error("Enter a check description and lowercase Test ID ending -test.");
+    if(a.tests[id])throw Error("That Test ID is already used.");
+    if(!guidedMaps.has(capability))throw Error("Capability mapping unavailable.");
+    if(!path.startsWith("/")||path.length<2||/[\r\n]/.test(path))
+      throw Error("Select a complete absolute Linux file path.");
+    let t;
+    if(capability==="independent.textfilecontent54"){
+      if(!line?.trim()||/[\r\n]/.test(line))throw Error("Enter a single nonempty required line.");
+      t={test_title:title.trim(),capability,object:{
+          capability,object_title:"Find required line in "+path,
+          select:{full_path:{equals:path},pattern:{matches_regex:linePattern(line)},instance:{greater_than_or_equal:1}},
+          filesystem:"all",
+          collect:{ignore_case:false,multiline:true,singleline:false,item_creation:"all_object_elements_fullfilled"}
+        },
+        states:[{text:{equals:line,require:"at_least_one_exists_and_all_match"}}],
+        require:"at_least_one_exists_and_all_match",reported_elements:"all"};
+    }else if(capability==="unix.file"){
+      t={test_title:title.trim(),capability,object:{
+          capability,object_title:"Inspect file properties for "+path,
+          select:{full_path:{equals:path}},filesystem:"local"},
+        states:[{[field]:{equals:genericTypedValue(field,value),require:"at_least_one_exists_and_all_match"}}],
+        require:"at_least_one_exists_and_all_match",reported_elements:"all"};
+    }else throw Error("Capability not implemented.");
+    const old=a.evaluate;
+    if(old&&!old.test&&!Array.isArray(old.all)&&!Array.isArray(old.any))
+      throw Error("Nested/advanced expression must be edited in Source.");
+    if(old?.test&&!a.tests[old.test])throw Error("Existing Test reference is unresolved.");
+    a.tests[id]=t;
+    if(!old)a.evaluate={test:id};
+    else if(old.test)a.evaluate={all:[old,{test:id}]};
+    else {const op=old.all?"all":"any";a.evaluate={[op]:[...(old[op]),{test:id}]}}
+  }
+  function genericTreeReady(a){
+    const entries=Object.entries(a.tests||{});
+    if(!entries.every(([,t])=>["independent.textfilecontent54","unix.file"].includes(t.capability)&&
+         t.object?.select?.full_path?.equals&&Array.isArray(t.states)))return false;
+    const leaves=a.evaluate?.all||a.evaluate?.any||(a.evaluate?.test?[a.evaluate]:[]);
+    return leaves.length===entries.length&&leaves.every(x=>x&&typeof x.test==="string"&&a.tests[x.test])&&
+      new Set(leaves.map(x=>x.test)).size===leaves.length;
+  }
+  function genericChange(modify,success){
+    const d=doc(),before=structuredClone(d.tree);
+    try{
+      modify(d.tree.assessment);
+      if(!genericTreeReady(d.tree.assessment))throw Error("Test references inconsistent; no changes saved.");
+      const source=jsyaml.dump(d.tree,{lineWidth:105,noRefs:true});parse(source);
+      d.source=source;d.changed=true;saveState();render();
+      display(success+" — draft only, without schema or scanner validation.");
+    }catch(err){d.tree=before;render();display(err.message,true)}
+  }
+
   function renderStandaloneCreation(){
     if(newCreateMode==="blank"){renderBlankCreation();return}
     $("crumb").textContent="MY ASSESSMENTS / NEW";$("title").textContent="New Assessment";
