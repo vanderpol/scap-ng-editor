@@ -233,6 +233,39 @@ try {
     'platform survives reload and still filters available capabilities');
   assert.equal(await page.locator('#generic-capability option[value="unix.file"]').count(),0);
 
+  // A source-only export or older draft has no authoring platform metadata.
+  // Reassociation requires an explicit compatible choice and MUST NOT mutate
+  // any platform-unspecified Assessment YAML or silently infer applicability.
+  await page.evaluate(id=>{
+    const key='scapng-browser-drafts-v1';
+    const drafts=JSON.parse(localStorage.getItem(key));
+    const draft=drafts.find(x=>x.source.includes('id: '+id+'\n'));
+    if(!draft)throw new Error('Windows local draft not found');
+    delete draft.guidedPlatform;
+    localStorage.setItem(key,JSON.stringify(drafts));
+  },winYaml.assessment.id);
+  await page.reload({waitUntil:'domcontentloaded'});
+  await page.waitForFunction(() => document.querySelectorAll('.stig-toggle').length >= 4,{timeout:45000});
+  await page.locator('[data-standalone="'+winYaml.assessment.id+'"]').click();
+  assert.equal(await page.locator('#generic-platform').inputValue(),'',
+    'legacy draft with no platform must not be silently categorized');
+  assert(await page.locator('#generic-platform').isEnabled(),
+    'compatible legacy drafts must be recoverable without removing Tests');
+  assert.deepEqual(await page.locator('#generic-platform option:not([disabled])').evaluateAll(es=>es.map(x=>x.value)),
+    ['windows'],'an existing Windows Registry Test must only allow a Windows restoration');
+  await page.locator('[data-view="source"]').click();
+  const sourceBeforePlatform=await page.locator('#rawyaml').inputValue();
+  await page.locator('[data-view="guided"]').click();
+  page.once('dialog',dialog=>dialog.accept());
+  await page.locator('#generic-platform').selectOption('windows');
+  assert(await page.locator('#generic-platform').isDisabled(),
+    'platform must lock again after associating an existing Test');
+  await page.locator('[data-view="source"]').click();
+  assert.equal(await page.locator('#rawyaml').inputValue(),sourceBeforePlatform,
+    'platform metadata restoration must leave authored YAML completely unchanged');
+  await page.locator('[data-view="guided"]').click();
+  assert.equal(await page.locator('#generic-capability option[value="unix.file"]').count(),0);
+
   // Original RHEL walkthrough remains optional and separate from blank flow.
   await page.locator('#new-assessment').click();
   await page.locator('#try-example').click();
