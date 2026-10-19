@@ -29,6 +29,9 @@ try {
   // same-file State conditions, then roundtrip through native 0.4-A YAML.
   await page.locator('#new-assessment').click();
   assert(await page.locator('#blank-create').isVisible(),'new default must be blank goal-first');
+  assert.equal(await page.locator('label[for="blank-goal"]').innerText(),
+    'What security requirement should be checked?',
+    'blank Guided prompt should come from the version-pinned SCAP-NG authoring vocabulary');
   assert.equal(await page.locator('#blank-goal').inputValue(),'',
     'the security goal must not prepopulate a RHEL example');
   assert.equal(await page.locator('#blank-id').inputValue(),'');
@@ -42,6 +45,10 @@ try {
   assert.equal(genericCaps.length,4,'Guided exposes four version-pinned capability forms');
   assert(genericCaps.some(x=>x.includes('unix.symlink')));
   assert(genericCaps.some(x=>x.includes('windows.registry')));
+  assert(genericCaps.some(x=>x.includes('Read Windows Registry settings')),
+    'registry capability description must come from shared SCAP-NG vocabulary');
+  assert((await page.locator('label[for="generic-capability"]').innerText()).includes('Which capability'),
+    'capability prompt should use shared source terminology');
   await page.locator('#generic-check-title').fill('Audit log owned by root');
   assert.equal(await page.locator('#generic-check-id').inputValue(),'audit-log-owned-by-root-test');
   await page.locator('#generic-capability').selectOption('unix.file');
@@ -123,6 +130,15 @@ try {
   await page.locator('#generic-path').fill('SOFTWARE\\ExampleVendor\\Security');
   await page.locator('#generic-registry-name').fill('SecurityMode');
   await page.locator('#generic-field').selectOption('type');
+  const registryMap=await page.evaluate(async()=>{
+    const c=window.SCAPNG_GUIDED_MAPPINGS;
+    const response=await fetch('https://raw.githubusercontent.com/'+c.repository+'/'+c.revision+
+      '/schema/v0.4.0/capability-mappings/supported/windows.registry.json');
+    return response.json();
+  });
+  assert.deepEqual(await page.locator('#generic-value option').evaluateAll(options=>options.map(x=>x.value)),
+    registryMap.native.state_value_enums.type,
+    'Registry storage type dropdown must exactly match the pinned capability/schema enumeration');
   assert.equal(await page.locator('#generic-value').evaluate(e=>e.tagName),'SELECT',
     'Registry type is constrained by pinned enum');
   await page.locator('#generic-value').selectOption('string');
