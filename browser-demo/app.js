@@ -20,7 +20,7 @@
     ["ms_windows_server_dns/rules/SV-259345.rule.yaml","rule"],
     ["ms_windows_server_dns/assessments/automated/SV-259345.automated.yaml","assessment"]
   ];
-  let docs=new Map(),ruleRows=[],chosen=null,standaloneId=null,creatingStandalone=false,selectedTest=null,view="graphical",step=0,filter="all",search="",message="",dirtySource=false;
+  let docs=new Map(),ruleRows=[],chosen=null,standaloneId=null,creatingStandalone=false,selectedTest=null,view="graphical",step=0,filter="all",search="",message="",dirtySource=false,newCreateMode="blank";
   // Only one STIG can reveal its Rules. Others have no Rule DOM nodes.
   let expandedStig=null;
   const stigScrollPositions=new Map();
@@ -102,11 +102,11 @@
   function readState(){
     try{
       const stored=JSON.parse(localStorage.getItem("scapng-browser-drafts-v1")||"null");
-      if(Array.isArray(stored))for(const d of stored){try{addDoc(d.name,d.source,"Local browser draft",true,d.sourcePath||null)}catch(e){}}
+      if(Array.isArray(stored))for(const d of stored){try{const key=addDoc(d.name,d.source,"Local browser draft",true,d.sourcePath||null);docs.get(key).guidedGeneric=d.guidedGeneric===true}catch(e){}}
     }catch(e){}
   }
   function saveState(){
-    try{localStorage.setItem("scapng-browser-drafts-v1",JSON.stringify([...docs.values()].filter(d=>d.origin==="Local import"||d.origin==="Locally created draft"||d.origin==="Local browser draft"||d.changed).map(d=>({name:d.name,source:d.source,sourcePath:d.sourcePath}))))}catch(e){}
+    try{localStorage.setItem("scapng-browser-drafts-v1",JSON.stringify([...docs.values()].filter(d=>d.origin==="Local import"||d.origin==="Locally created draft"||d.origin==="Local browser draft"||d.changed).map(d=>({name:d.name,source:d.source,sourcePath:d.sourcePath,guidedGeneric:d.guidedGeneric===true}))))}catch(e){}
   }
   const STIG_NAMES=Object.freeze({
     "rhel_9":"RHEL 9",
@@ -1154,11 +1154,13 @@
   }
 
   function renderStandaloneCreation(){
+    if(newCreateMode==="blank"){renderBlankCreation();return}
     $("crumb").textContent="MY ASSESSMENTS / NEW";$("title").textContent="New Assessment";
     $("state").textContent="Draft · no scanner";
     $("notice").textContent="Not linked to a STIG or Rule. Author a standalone text-file check against the pinned 0.4-A base draft.";
     $("content").innerHTML='<section class="card"><h3>Create an Assessment without a STIG</h3>'+
       '<p>First describe what to check. Then use Guided to review and change every choice.</p>'+
+      '<button type="button" id="create-blank" class="button">Start with a blank goal instead</button>'+
       '<form id="standalone-create" class="standalone-create">'+
       '<label for="create-title">What security requirement should be checked?</label><input name="title" id="create-title" required value="The RHEL login banner must contain the required notice">'+
       '<label for="create-capability">How should we inspect it?</label><select name="capability" id="create-capability">'+
@@ -1182,6 +1184,7 @@
       '<p class="help">The additional permission check uses unix.file and expects root ownership, group_write=false and other_write=false on this same path.</p></div>'+
       '<button class="button primary" type="submit">Create draft and open Guided →</button></form>'+
       '<p class="help" id="create-error" role="alert"></p></section>';
+    const goBlank=$("create-blank");if(goBlank)goBlank.onclick=()=>{newCreateMode="blank";render()};
     const goal=$("create-title"),sourceName=$("create-source-title"),fileName=$("create-file"),capability=$("create-capability");
     const scope=$("create-scope"),extra=$("create-extra-line"),extraWrap=$("create-extra-line-wrap");
     scope.onchange=()=>{const multi=scope.value==="protected";extraWrap.hidden=!multi;extra.required=multi};
@@ -1218,6 +1221,7 @@
       path:obj?.select?.full_path?.equals};
   }
   function standaloneWizard(){
+    if(doc()?.guidedGeneric)return genericWizard();
     if(multiBannerParts())return standaloneMultiWizard();
     const {a,t,obj,line,path}=bannerParts();
     if(!a||!t||!obj||typeof line!=="string")
@@ -1264,6 +1268,7 @@
       '<button id="gotoGraph" class="button">Graphical overview</button></div>';
   }
   function standaloneOverview(){
+    if(doc()?.guidedGeneric){const a=doc().tree.assessment;return Object.keys(a.tests||{}).length?overview():'<section class="card"><h3>No checks yet</h3><p>Return to Guided to add a first capability-backed check. This incomplete draft cannot yet be meaningfully evaluated.</p></section>'}
     const {line,path}=bannerParts();
     return '<section class="card"><h3>What this check means</h3>'+
       '<p><strong>Look at:</strong> '+esc(path||"the authored file")+'</p>'+
@@ -1371,6 +1376,7 @@
     $("content").querySelectorAll("[data-step]").forEach(b=>b.onclick=()=>{step=Number(b.dataset.step);render()});
     bindStandaloneEditors();
     bindMultiWizardEditors();
+    bindGenericEditors();
     $("content").querySelectorAll("[data-field]").forEach(e=>e.onchange=()=>{
       const path=JSON.parse(decodeURIComponent(e.dataset.field));
       let d=doc(),v=e.value;
@@ -1454,7 +1460,7 @@
   $("query").oninput=e=>{search=e.target.value.toLowerCase();expandedStig=null;chosen=null;standaloneId=null;creatingStandalone=false;selectedTest=null;library();render()};
   $("tabs").querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>setView(b.dataset.view));
   $("new-assessment").onclick=()=>{
-    standaloneId=null;chosen=null;creatingStandalone=true;selectedTest=null;step=0;view="guided";library();render();
+    standaloneId=null;chosen=null;creatingStandalone=true;newCreateMode="blank";selectedTest=null;step=0;view="guided";library();render();
   };
   $("import").onclick=()=>$("upload").click();
   $("upload").onchange=async e=>{
