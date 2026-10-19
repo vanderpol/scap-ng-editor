@@ -21,6 +21,7 @@
     ["ms_windows_server_dns/assessments/automated/SV-259345.automated.yaml","assessment"]
   ];
   let docs=new Map(),ruleRows=[],chosen=null,selectedTest=null,view="graphical",step=0,filter="all",search="",message="",dirtySource=false;
+  const expandedStigs=new Set();
   let sampleText="",candidate=new Map();
   // Load interpreter choices from the exact upstream version-pinned capability mapping.
   // No guessed fallback enum: when unavailable, users can still inspect raw YAML.
@@ -70,28 +71,43 @@
     if(!kind||typeof o[kind]!=="object"||!o[kind].id)throw Error("Expected a rule.id or assessment.id");
     return {kind,id:String(o[kind].id),tree:o};
   }
-  function addDoc(name,source,origin,override=false){
+  function addDoc(name,source,origin,override=false,sourcePath=null){
     const p=parse(source),key=p.kind+":"+p.id;
     if(docs.has(key)&&!override)throw Error("File with id "+p.id+" already loaded");
     const prev=docs.get(key);
-    docs.set(key,{name:String(name),key,kind:p.kind,id:p.id,tree:p.tree,source,original:prev?prev.original:source,origin,changed:false});
+    docs.set(key,{name:String(name),key,kind:p.kind,id:p.id,tree:p.tree,source,original:prev?prev.original:source,origin,sourcePath:sourcePath||prev?.sourcePath||null,changed:false});
     return key;
   }
   function readState(){
     try{
       const stored=JSON.parse(localStorage.getItem("scapng-browser-drafts-v1")||"null");
-      if(Array.isArray(stored))for(const d of stored){try{addDoc(d.name,d.source,"Local browser draft",true)}catch(e){}}
+      if(Array.isArray(stored))for(const d of stored){try{addDoc(d.name,d.source,"Local browser draft",true,d.sourcePath||null)}catch(e){}}
     }catch(e){}
   }
   function saveState(){
-    try{localStorage.setItem("scapng-browser-drafts-v1",JSON.stringify([...docs.values()].filter(d=>d.origin==="Local import"||d.changed).map(d=>({name:d.name,source:d.source}))))}catch(e){}
+    try{localStorage.setItem("scapng-browser-drafts-v1",JSON.stringify([...docs.values()].filter(d=>d.origin==="Local import"||d.changed).map(d=>({name:d.name,source:d.source,sourcePath:d.sourcePath}))))}catch(e){}
+  }
+  const STIG_NAMES=Object.freeze({
+    "rhel_9":"RHEL 9",
+    "ms_windows_11":"Windows 11",
+    "apache_server_2-4_unix_server":"Apache HTTP Server 2.4 (Unix)",
+    "ms_windows_server_dns":"Windows Server DNS",
+    "oracle_linux_9":"Oracle Linux 9",
+    "ms_windows_server_2025":"Windows Server 2025"
+  });
+  function stigForRule(d){
+    const source=d.sourcePath;
+    if(!source)return {key:"imported",name:"Imported Rules (STIG not identified)"};
+    const part=source.replaceAll("\\","/").split("/")[0];
+    if(!part||part==="rules")return {key:"imported",name:"Imported Rules (STIG not identified)"};
+    return {key:part,name:STIG_NAMES[part]||part.replaceAll("_"," ")};
   }
   function indexRules(){
     ruleRows=[...docs.values()].filter(d=>d.kind==="rule").map(d=>{
       let r=d.tree.rule,aid=r.assessment_choices?.automated?.assessment;
       let linked=aid?docs.get("assessment:"+aid):undefined;
       let status=linked?"automated":aid?"needs-review":"not-automated";
-      return {id:String(r.id),title:String(r.title||r.id),severity:String(r.severity||"unknown"),version:r.version||"",aliases:(r.identifiers||[]).map(x=>x.value).filter(Boolean),aid,linked,status};
+      return {id:String(r.id),title:String(r.title||r.id),severity:String(r.severity||"unknown"),version:r.version||"",aliases:(r.identifiers||[]).map(x=>x.value).filter(Boolean),aid,linked,status,stig:stigForRule(d)};
     }).sort((a,b)=>a.id.localeCompare(b.id));
   }
   const active=()=>ruleRows.find(r=>r.id===chosen);
@@ -99,22 +115,43 @@
   function display(txt,bad=false){message=txt;$("status").textContent=txt;$("status").className=bad?"warning":""}
   function flag(r){
     if(candidate.has(r.id))return '<span class="tag orange">AI candidate? Human proposal only</span>';
-    if(r.status==="automated")return '<span class="tag green">Linked automated Assessment</span>';
+    if(r.status==="automated")return '<span class="tag green">Automated Assessment</span>';
     if(r.status==="needs-review")return '<span class="tag orange">Assessment link not loaded</span>';
     return '<span class="tag orange">No automation link in loaded Rule</span>';
   }
   function library(){
-    const choices=[["all","All"],["automated","Automated"],["not-automated","Not automated"],["needs-review","Needs review"],["candidates","Candidates"]];
+    const choices=[["all","All"],["automated","Automated"],["not-automated","Without automated choice"],["needs-review","Assessment not loaded"],["candidates","Candidates"]];
     $("filters").innerHTML=choices.map(([val,name])=>'<button class="'+(filter===val?"selected":"")+'" data-filter="'+val+'">'+name+'</button>').join("");
-    $("filters").querySelectorAll("[data-filter]").forEach(b=>b.onclick=()=>{filter=b.dataset.filter;library()});
+    $("filters").querySelectorAll("[data-filter]").forEach(b=>b.onclick=()=>{
+      filter=b.dataset.filter;expandedStigs.clear();library();
+    });
     const matches=ruleRows.filter(r=>{
-      if(search&&!(r.id+" "+r.title+" "+r.version+" "+r.aliases.join(" ")).toLowerCase().includes(search))return false;
+      if(search&&!(r.id+" "+r.title+" "+r.version+" "+r.aliases.join(" ")+" "+r.stig.name).toLowerCase().includes(search))return false;
       if(filter==="candidates")return candidate.has(r.id);
       if(filter==="all")return true;
       return r.status===filter;
     });
-    $("counter").textContent=matches.length+" of "+ruleRows.length+" loaded Rules · not a complete benchmark";
-    $("rules").innerHTML=matches.length?matches.map(r=>'<div class="rule '+(chosen===r.id?"active":"")+'" data-id="'+esc(r.id)+'"><span class="rid">'+esc(r.id)+'</span><p>'+esc(r.title)+'</p>'+flag(r)+'</div>').join(""):'<div class="empty">No matching Rules in the loaded files.<p>Import Rule YAML to broaden the search.</p></div>';
+    const grouped=new Map();
+    for(const r of matches){
+      if(!grouped.has(r.stig.key))grouped.set(r.stig.key,{stig:r.stig,rules:[]});
+      grouped.get(r.stig.key).rules.push(r);
+    }
+    const groups=[...grouped.values()].sort((a,b)=>a.stig.name.localeCompare(b.stig.name));
+    $("counter").textContent=groups.length+" STIGs · "+matches.length+" of "+ruleRows.length+" loaded Rules · partial source catalog";
+    $("rules").innerHTML=groups.length?groups.map(({stig,rules})=>{
+      const expanded=Boolean(search)||expandedStigs.has(stig.key),automated=rules.filter(r=>r.status==="automated").length;
+      return '<section class="stig-group">'+
+        '<button class="stig-toggle" data-stig="'+esc(stig.key)+'" aria-expanded="'+expanded+'">'+
+        '<span class="stig-arrow">'+(expanded?"▾":"▸")+'</span><span class="stig-title">'+esc(stig.name)+'</span>'+
+        '<small>'+rules.length+' Rules · '+automated+' automated linked</small></button>'+
+        '<div class="stig-rules" '+(expanded?"":'hidden')+'>'+
+        rules.map(r=>'<button class="rule '+(chosen===r.id?"active":"")+'" data-id="'+esc(r.id)+'"><span class="rid">'+esc(r.id)+'</span><span class="rule-name">'+esc(r.title)+'</span>'+
+          flag(r)+(r.linked&&r.aid.startsWith("ng.shared.")?'<span class="tag">Shared Assessment resolved</span>':"")+
+          '</button>').join("")+'</div></section>';
+    }).join(""):'<div class="empty">No matching loaded Rules.<p>Import Rule and Assessment YAML to broaden your library.</p></div>';
+    $("rules").querySelectorAll("[data-stig]").forEach(b=>b.onclick=()=>{
+      const id=b.dataset.stig;if(expandedStigs.has(id))expandedStigs.delete(id);else expandedStigs.add(id);library();
+    });
     $("rules").querySelectorAll("[data-id]").forEach(e=>e.onclick=()=>open(e.dataset.id));
   }
   function open(id){chosen=id;selectedTest=null;view="graphical";step=0;dirtySource=false;library();render()}
@@ -627,7 +664,7 @@
   $("import").onclick=()=>$("upload").click();
   $("upload").onchange=async e=>{
     let imported=0;
-    for(const file of Array.from(e.target.files)){try{addDoc(file.name,await file.text(),"Local import");imported++}catch(err){display(file.name+": "+err.message,true)}}
+    for(const file of Array.from(e.target.files)){try{addDoc(file.name,await file.text(),"Local import",false,file.webkitRelativePath||null);imported++}catch(err){display(file.name+": "+err.message,true)}}
     e.target.value="";indexRules();library();saveState();if(!chosen&&ruleRows.length)open(ruleRows[0].id);else render();
     if(imported)display("Imported "+imported+" source document(s). This is a local browser draft.");
   };
@@ -638,11 +675,11 @@
     display("Loading six pinned source-backed Rule/Assessment examples from public GitHub…");
     const capabilityLoad=loadShellVocabulary();
     const got=await Promise.all(seeded.map(async ([path])=>{
-      try{const url=src+path;const res=await fetch(url,{cache:"force-cache"});if(!res.ok)throw Error("HTTP "+res.status);return {name:path.split("/").pop(),text:await res.text(),url}}
+      try{const url=src+path;const res=await fetch(url,{cache:"force-cache"});if(!res.ok)throw Error("HTTP "+res.status);return {name:path.split("/").pop(),text:await res.text(),url,path}}
       catch(e){return {err:path+": "+e.message}}
     }));
     let failures=[];
-    for(const item of got){if(item.err){failures.push(item.err);continue}try{addDoc(item.name,item.text,"Pinned source "+snap.slice(0,10))}catch(e){failures.push(item.name+": "+e.message)}}
+    for(const item of got){if(item.err){failures.push(item.err);continue}try{addDoc(item.name,item.text,"Pinned source "+snap.slice(0,10),false,item.path)}catch(e){failures.push(item.name+": "+e.message)}}
     await capabilityLoad;
     readState();indexRules();if(ruleRows.length)chosen=ruleRows[0].id;library();render();
     display(failures.length?"Only "+(got.length-failures.length)+" examples loaded; import local YAML to continue. "+failures[0]:"Loaded "+ruleRows.length+" pinned Rules and linked Assessments. Choose one to review.",!!failures.length);
