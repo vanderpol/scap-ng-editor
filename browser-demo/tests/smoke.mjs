@@ -139,6 +139,11 @@ try {
   assert.deepEqual(await page.locator('#generic-value option').evaluateAll(options=>options.map(x=>x.value)),
     registryMap.native.state_value_enums.type,
     'Registry storage type dropdown must exactly match the pinned capability/schema enumeration');
+  assert((await page.locator('#generic-field option:checked').innerText()).includes('Registry storage type'),
+    'type State option must display the centralized Registry field label');
+  assert((await page.locator('#generic-registry-type-help').innerText()).includes(
+    registryMap.native.field_datatypes.value.join(', ')),
+    'distinct multi-datatype value field must be accurately described from the pinned mapping');
   assert.equal(await page.locator('#generic-value').evaluate(e=>e.tagName),'SELECT',
     'Registry type is constrained by pinned enum');
   await page.locator('#generic-value').selectOption('string');
