@@ -13,6 +13,14 @@
 - Draft edits are stored in **the local browser storage for that origin**, not on GitHub or an AI service. The app performs no GitHub writes. The user remains responsible for exporting a reviewed copy.
 - The **Sample data tab is now a deliberately disabled mock** showing where typed Items, source status and a future interpreter trace will go. Input/evaluate controls do not run until the editor is integrated with a tested SCAP-NG scanner evaluation kernel.
 
+## Guided stability checkpoint — October 19
+
+The **default new-Assessment flow** begins with **Target platform** followed by the security goal. **Linux** exposes only the three implemented Linux-form capabilities (`independent.textfilecontent54`, `unix.file`, `unix.symlink`); **Windows** exposes only `windows.registry`. Other operating systems are visible but disabled until the appropriate Guided forms have been implemented. This is a form-availability filter, **not** a formal SCAP-NG applicability/CPE assertion.
+
+The platform choice is local authoring metadata, not an invented Assessment YAML field. Once a Test exists, the platform is locked; the author must remove the Tests or create a different Assessment to change platform. When opening older browser drafts lacking that metadata, the editor offers only platform selections compatible with **all** existing Tests. Associating an older draft requires explicit confirmation and leaves its original YAML byte-for-byte unchanged.
+
+**Verified bounds:** Chrome smoke covers Linux/Windows capability isolation, changing platforms before the first Test, locking afterward, source/YAML roundtrip, restoring old metadata, and reloading local drafts; [browser regression](https://github.com/vanderpol/scap-ng-editor/actions/runs/39247076920) passed. This stabilizes the *supported pilot*, not the entire editor: complete schema validation, full capability coverage, scanner parity and source-preserving edits remain open in [#14](https://github.com/vanderpol/scap-ng-editor/issues/14) / [#3](https://github.com/vanderpol/scap-ng-editor/issues/3). Newer research on 0.4-C must **not** silently change the pinned 0.4-A Guided contract.
+
 ## Create a standalone Assessment in Guided mode (experimental)
 
 - **New default — start from a blank security goal (19 October):** **My Assessments → + New Assessment** opens an empty requirement description, not the prefilled RHEL login banner. Enter any goal; the UI suggests an editable `custom.<goal>` Assessment ID. The new local draft deliberately begins with zero Tests and no invented `not_applicable` result; it is **incomplete until a check is added**.
