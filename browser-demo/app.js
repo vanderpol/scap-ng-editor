@@ -150,7 +150,7 @@
     if(n.record?.fields)return "record: "+Object.entries(n.record.fields).map(([k,v])=>k+" "+summarizeCondition(v,depth+1)).join("; ");
     const comparisons=["equals","case_insensitive_equals","matches_regex","greater_than_or_equal","less_than_or_equal","greater_than","less_than"];
     const cmp=comparisons.find(k=>Object.hasOwn(n,k));
-    if(cmp)return prettyName(cmp)+" "+String(n[cmp])+(n.require?" ["+requirementDescription(n.require)+" (require)]":"");
+    if(cmp)return prettyName(cmp)+" "+String(n[cmp]);
     return Object.entries(n).filter(([k])=>k!=="require"&&k!=="state_fields_require").slice(0,4).map(([k,v])=>k+" "+summarizeCondition(v,depth+1)).join("; ");
   }
   function summarizeTest(t){
@@ -160,7 +160,7 @@
     if(!parts.length)return states.length+" expected conditions (States)";
     const join=t.states_match==="any"?" OR ":t.states_match==="all"?" AND ":" · ";
     const s=parts.join(join)+(states.length>2?" … +"+(states.length-2)+" other conditions":"");
-    return s.length>235?s.slice(0,230)+"… (expand details)":s;
+    return s.length>125?s.slice(0,121)+"…":s;
   }
   function walk(o,path,heading,depth=0){
     if(depth>32)return '<p class="warning">Deep structure. Use Source to inspect further.</p>';
@@ -367,16 +367,16 @@
     const input=isBool?'<span class="help">Boolean comparison; use Source to change the value.</span>':
       '<input id="predicate-value" type="text" class="predicate-value" data-field="'+fieldPath+'" value="'+esc(String(value))+'" aria-label="Expected value for '+esc(name)+'" spellcheck="false">';
     return '<div class="inline-predicate" aria-label="Edit expected condition">'+
-      '<div class="predicate-heading">Required condition <small>(State)</small></div>'+
+      '<div class="predicate-heading">Check (State)</div>'+
       '<div class="predicate-grid">'+
-      '<div class="predicate-part"><label>From each result, check field</label><code class="field-name">'+esc(name)+'</code></div>'+
-      '<div class="predicate-part"><label for="predicate-operation">Comparison</label><select id="predicate-operation" data-operation="'+opPath+'" aria-label="Comparison for '+esc(name)+'">'+opChoices+'</select></div>'+
-      '<div class="predicate-part"><label for="predicate-value">Expected value</label>'+input+'</div>'+
+      '<div class="predicate-part"><label>Field</label><code class="field-name">'+esc(name)+'</code></div>'+
+      '<div class="predicate-part"><label for="predicate-operation">Must</label><select id="predicate-operation" data-operation="'+opPath+'" aria-label="Comparison for '+esc(name)+'">'+opChoices+'</select></div>'+
+      '<div class="predicate-part"><label for="predicate-value">Value</label>'+input+'</div>'+
       '</div>'+
-      (matcher.require?'<div class="predicate-quantity"><label>How many values of <code>'+esc(name)+'</code> within each result must match? (require)</label>'+
+      (matcher.require?'<div class="predicate-quantity"><label>Matching values per result (require)</label>'+
         requirementSelect(base.concat("require"),matcher.require,"Field-value matching requirement")+'</div>':
-        '<p class="help">No field-specific count requirement was authored; the editor does not assume one.</p>')+
-      '<p class="help">Changing a comparison changes its meaning. The draft preserves other known fields, but it is not schema- or scanner-verified.</p>'+
+        '')+
+      ''+
       '</div>';
   }
   // Applies at the Test's collected-Item population, not to State fields.
@@ -452,17 +452,17 @@
       '<p class="check-sentence"><strong>Look at</strong> '+esc(from.text)+'. <small>'+esc(from.detail)+'</small></p>'+
       shellCommandDetails(a,id,t)+
       (shape?oneFieldEditor(id,t):
-        '<div class="condition-readonly"><strong>Required conditions (States)</strong><p>'+esc(summarizeTest(t))+'</p><p class="help">This check has multiple or nested conditions. Expand the detailed view to edit each one.</p></div>')+
-      '<div class="quick-results"><label>Which collected results must exist and match?</label>'+
+        '<div class="condition-readonly"><strong>Conditions (States)</strong><p>'+esc(summarizeTest(t))+'</p><p class="help">Open full details to edit nested conditions.</p></div>')+
+      '<div class="quick-results"><label>Matching collected results (collected_items_require)</label>'+
       requirementSelect(["assessment","tests",id,"collected_items_require"],t.collected_items_require,"Results that must be found and match")+
-      '<details class="result-explanation"><summary>Explain this requirement</summary>'+
+      '<details class="result-explanation"><summary>What does this mean?</summary>'+
       '<p><strong>Must be found:</strong> '+esc(counts.found)+'</p>'+
       '<p><strong>Must match:</strong> '+esc(counts.match)+'</p>'+
-      '<p class="help">These are results returned by “Look at,” not values of an individual State field.</p></details>'+
+      '<p class="help">This applies to collected results, not fields inside them.</p></details>'+
       '</div>'+
-      (t.states_match?'<p class="help">Alternative conditions: '+esc(mode)+'. <span>(states_match)</span></p>':"")+
-      (t.state_fields_require?'<p class="help">Across State fields: '+esc(requirementDescription(t.state_fields_require))+' (state_fields_require)</p>':"")+
-      '<p class="help">Only authored settings are edited. Draft edits currently reformat YAML and are not scanner-verified.</p>'+
+      (t.states_match?'<p class="help">Alternatives: '+esc(mode)+' (states_match)</p>':"")+
+      (t.state_fields_require?'<p class="help">State fields: '+esc(requirementDescription(t.state_fields_require))+' (state_fields_require)</p>':"")+
+      
       '</section>';
   }
   function inspector(a,id,refs){
