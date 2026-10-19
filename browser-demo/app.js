@@ -923,7 +923,9 @@
   // It does not simulate a scanner or assert full-file banner equivalence.
   const BANNER_TEST="rhel-login-banner-required-line-test";
   const linePattern=value=>"^"+Array.from(value).map(c=>".*+?^$()[]{}|\\".includes(c)?"\\"+c:c).join("")+"$";
-  function buildBannerAssessment(id,title,filePath,requiredLine){
+  function buildBannerAssessment(id,title,filePath,requiredLine,capability,sourceTitle){
+    if(capability!=="independent.textfilecontent54")throw Error("This Guided preset does not yet support that capability.");
+    if(!sourceTitle.trim())throw Error("Name the data source in plain language.");
     if(!/^[a-z0-9]+(?:[a-z0-9.-]*[a-z0-9])?$/.test(id))throw Error("Use a meaningful lowercase Assessment ID (letters, digits, periods and hyphens).");
     if(docs.has("assessment:"+id))throw Error("Assessment ID already exists in My Assessments or the library.");
     if(!title.trim())throw Error("Enter a short description of the requirement.");
@@ -936,7 +938,8 @@
         test_title:"Login banner file contains the required line",
         capability:"independent.textfilecontent54",
         object:{
-          capability:"independent.textfilecontent54",
+          capability,
+          object_title:sourceTitle.trim(),
           select:{
             full_path:{equals:filePath},
             pattern:{matches_regex:linePattern(requiredLine)},
@@ -959,9 +962,17 @@
     $("content").innerHTML='<section class="card"><h3>Create an Assessment without a STIG</h3>'+
       '<p>First describe what to check. Then use Guided to review and change every choice.</p>'+
       '<form id="standalone-create" class="standalone-create">'+
-      '<label for="create-id">Assessment ID</label><input name="id" id="create-id" required value="custom.rhel-login-banner-required-line" spellcheck="false">'+
-      '<label for="create-title">What must be true?</label><input name="title" id="create-title" required value="The RHEL login banner must contain the required notice">'+
-      '<label for="create-file">Which file should be read?</label><input name="file" id="create-file" required value="/etc/issue" spellcheck="false">'+
+      '<label for="create-title">What security requirement should be checked?</label><input name="title" id="create-title" required value="The RHEL login banner must contain the required notice">'+
+      '<label for="create-capability">How should we inspect it?</label><select name="capability" id="create-capability">'+
+      '<option value="independent.textfilecontent54">Read and match text in a file — independent.textfilecontent54</option>'+
+      '<option value="unix.symlink" disabled>Resolve a symbolic link — unix.symlink (coming later)</option>'+
+      '<option value="windows.registry" disabled>Read Windows Registry settings — windows.registry (coming later)</option>'+
+      '<option value="windows.wmi.query" disabled>Query Windows system information — windows.wmi.query (coming later)</option></select>'+
+      '<p class="help">The selected capability determines the source prompts. Other capabilities are not yet available in this authoring preset.</p>'+
+      '<label for="create-id">Suggested Assessment ID (editable)</label><input name="id" id="create-id" required value="custom.rhel-login-banner-required-line" spellcheck="false">'+
+      '<label for="create-source-title">Name this data source (editable)</label><input name="sourceTitle" id="create-source-title" required value="Read required login-banner text in /etc/issue">'+
+      '<p class="help">This is an inline collection and needs no Object ID. Reusable shared Objects will get capability-specific, editable names ending in -object.</p>'+
+      '<label for="create-file">Which text file should be read?</label><input name="file" id="create-file" required value="/etc/issue" spellcheck="false">'+
       '<p class="help">/etc/issue is a common local login-banner file. It does not automatically prove which banner is shown by SSH or another login service.</p>'+
       '<label for="create-line">What exact line must appear? (user-defined)</label><textarea name="line" id="create-line" required rows="3" spellcheck="false" placeholder="Type the required text."></textarea>'+
       '<p class="help">This initial preset requires at least one complete matching line; it does not compare the entire file or render escape sequences.</p>'+
@@ -974,7 +985,9 @@
         const a=buildBannerAssessment(form.elements.namedItem("id").value.trim(),
           form.elements.namedItem("title").value,
           form.elements.namedItem("file").value,
-          form.elements.namedItem("line").value);
+          form.elements.namedItem("line").value,
+          form.elements.namedItem("capability").value,
+          form.elements.namedItem("sourceTitle").value);
         const raw=jsyaml.dump(a,{lineWidth:105,noRefs:true});
         const p=parse(raw);
         addDoc(p.id+".assessment.yaml",raw,"Locally created draft");
@@ -1003,7 +1016,9 @@
       '<p class="help">An independent automated Assessment. It can be reused or linked to a Rule later, without a dummy STIG.</p>'+
       '</section>';
     if(step===1)content='<section class="card"><h3>2 · Where should we look?</h3>'+
-      '<p><strong>Read a text file</strong> on RHEL using the textfilecontent54 capability.</p>'+
+      '<p><strong>Read a text file</strong> using the selected textfilecontent54 capability; only its supported inputs are shown.</p>'+
+      field(["assessment","tests",BANNER_TEST,"object","object_title"],"Data source description",obj.object_title)+
+      '<p class="help">Inline collection: no Object ID required. A reusable source would receive an editable capability-specific -object ID.</p>'+
       field(["assessment","tests",BANNER_TEST,"object","select","full_path","equals"],"File to inspect",path)+
       '<p class="help">Choose the exact file; this check does not search other directories.</p>'+
       field(["assessment","tests",BANNER_TEST,"object","filesystem"],"Filesystem scope",obj.filesystem,["all","local","same"])+
