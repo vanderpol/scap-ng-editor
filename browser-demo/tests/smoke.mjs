@@ -136,6 +136,7 @@ try {
   // Guided complexity gate: three Tests, two capabilities, and three independent
   // unix.file State predicates on one collected file. No STIG is associated.
   await page.locator('#new-assessment').click();
+  await page.locator('#try-example').click();
   await page.locator('#create-id').fill('custom.rhel-banner-and-file-protection');
   await page.locator('#create-title').fill('RHEL banner must contain two notices and prevent non-root edits');
   await page.locator('#create-line').fill('Authorized users only.');
