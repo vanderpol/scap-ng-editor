@@ -94,16 +94,40 @@ try {
   assert((await page.locator('#test-inspector .shellcommand-panel').innerText()).includes('no fixed command string'), 'Variable-generated Apache command must not be presented as a literal');
   assert((await page.locator('#test-inspector .shellcommand-panel').innerText()).includes('command from the Variable'), 'Apache command source must be identified');
   assert.equal(await page.locator('#test-inspector .shellcommand-panel textarea[data-field]').count(), 0, 'Variable-generated command must not be edited as if it were literal');
+  const apacheInterpreter=page.locator('#test-inspector .shellcommand-panel select.interpreter-select');
+  assert.equal(await apacheInterpreter.count(), 1, 'Apache shell must be editable in-place');
+  assert.equal(await apacheInterpreter.inputValue(), 'bash', 'Apache must display authored bash interpreter');
+  assert.deepEqual(await apacheInterpreter.locator('option').allTextContents(),
+    ['sh','bash','csh','ksh','zsh','cmd','powershell','pwsh'], 'Options must match pinned SCAP-NG shell mapping');
+  page.once('dialog', dialog => dialog.accept());
+  await apacheInterpreter.selectOption('sh');
+  await page.locator('[data-view="source"]').click();
+  const apacheShellSource=await page.locator('#rawyaml').inputValue();
+  const apacheShellAssessment=await page.evaluate(raw=>window.jsyaml.load(raw),apacheShellSource);
+  const apacheShellTest=apacheShellAssessment.assessment.tests['verify-that-keepalive-directive-defined-configured-on-in-httpd-conf-test'];
+  assert.equal(apacheShellTest.object.collect.shell,'sh','shell selection must change collect.shell only');
+  assert.equal(apacheShellTest.object.collect.command.variable,'shell-command-check-keepalive-in-httpd-conf-all-include-conf-variable','variable command reference must remain');
   await page.locator('[data-id="SV-259345"]').click();
   assert((await page.locator('.logic-group').count()) >= 2, 'DNS has nested alternatives');
   const dnsCommand=page.locator('#test-inspector .shellcommand-panel textarea[data-field]');
   assert.equal(await dnsCommand.count(), 1, 'Literal PowerShell command must be immediately visible in Test inspector');
   assert((await dnsCommand.inputValue()).includes('Get-DnsServerZone'), 'Display exact authored DNS PowerShell command');
-  await dnsCommand.fill('Get-DnsServerZone | Select-Object ZoneName');
-  await dnsCommand.press('Tab');
+  const dnsInterpreter=page.locator('#test-inspector .shellcommand-panel select.interpreter-select');
+  assert.equal(await dnsInterpreter.count(),1,'DNS PowerShell interpreter must be editable');
+  assert.equal(await dnsInterpreter.inputValue(),'powershell','DNS must show authored powershell interpreter');
+  page.once('dialog', dialog=>dialog.accept());
+  await dnsInterpreter.selectOption('pwsh');
+  assert.equal(await page.locator('#test-inspector .shellcommand-panel select.interpreter-select').inputValue(),'pwsh',
+    'updated shell must survive graphical re-render');
+  await page.locator('#test-inspector .shellcommand-panel textarea[data-field]').fill('Get-DnsServerZone | Select-Object ZoneName');
+  await page.locator('#test-inspector .shellcommand-panel textarea[data-field]').press('Tab');
   await page.locator('[data-view="source"]').click();
   const dnsYaml=await page.locator('#rawyaml').inputValue();
   assert(dnsYaml.includes('Get-DnsServerZone | Select-Object ZoneName'), 'Editing literal command must update corresponding YAML command field');
+  const dnsShellAssessment=await page.evaluate(raw=>window.jsyaml.load(raw),dnsYaml);
+  const dnsShellTest=dnsShellAssessment.assessment.tests['dns-server-caching-only-there-no-forward-or-reverse-lookup-test'];
+  assert.equal(dnsShellTest.object.collect.shell,'pwsh','shell selection must update the exact DNS collect.shell');
+  assert.equal(dnsShellTest.object.collect.command,'Get-DnsServerZone | Select-Object ZoneName','changing interpreter must not convert command text');
   assert(dnsYaml.includes('SV-259345.automated'), 'Editing command must not alter the Assessment identity');
 
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
