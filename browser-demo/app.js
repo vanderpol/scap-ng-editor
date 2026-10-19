@@ -23,6 +23,10 @@
   let docs=new Map(),ruleRows=[],chosen=null,selectedTest=null,view="graphical",step=0,filter="all",search="",message="",dirtySource=false;
   // Only one STIG can reveal its Rules. Others have no Rule DOM nodes.
   let expandedStig=null;
+  // Catalog metadata is separate from loaded/editable documents (lazy Rule/Assessment fetch).
+  let catalogRuleRows=[],catalogBase="",catalogAssessmentPaths=new Map(),catalogStatus="";
+  const catalogConfig=window.SCAPNG_COMPLETE_CATALOG||null;
+
   let sampleText="",candidate=new Map();
   // Load interpreter choices from the exact upstream version-pinned capability mapping.
   // No guessed fallback enum: when unavailable, users can still inspect raw YAML.
@@ -125,6 +129,97 @@
     }
     return {ready:true,reason:""};
   }
+  function safeCatalogPath(path){
+    return typeof path==="string"&&/^complete-stigs\/(?:authoring\/[a-z0-9_./-]+\.ya?ml|(?:rhel_9|ms_windows_11)\/index\.json|manifest\.json)$/.test(path)&&
+      !path.includes("..");
+  }
+  async function fetchCatalogText(path){
+    if(!catalogBase||!safeCatalogPath(path))throw Error("Invalid pinned catalog source path.");
+    const response=await fetch(catalogBase+path,{cache:"force-cache"});
+    if(!response.ok)throw Error("Source unavailable (HTTP "+response.status+")");
+    return response.text();
+  }
+  async function loadCompleteCatalog(){
+    const config=catalogConfig;
+    if(!config?.repository||!/^[0-9a-f]{40}$/.test(config.revision)||!config.manifestPath)return;
+    catalogBase="https://raw.githubusercontent.com/"+config.repository+"/"+config.revision+"/";
+    try{
+      const manifest=JSON.parse(await fetchCatalogText(config.manifestPath));
+      if(manifest.format!=="scap-ng-editor-complete-stigs/1"||manifest.source_tag!=="v0.4.0-joval-meeting-preview-20261015-r3"||
+         !Array.isArray(manifest.stigs)||manifest.stigs.length!==2||!manifest.assessment_paths)throw Error("Unexpected preview catalog manifest.");
+      const indexes=await Promise.all(manifest.stigs.map(async stig=>{
+        if(!safeCatalogPath(stig.index_path))throw Error("Unsafe Rule index path");
+        return {stig,document:JSON.parse(await fetchCatalogText(stig.index_path))};
+      }));
+      const entries=[], paths=new Map();
+      for(const [id,path] of Object.entries(manifest.assessment_paths)){
+        if(typeof id!=="string"||!safeCatalogPath(path))throw Error("Invalid Assessment index entry");
+        paths.set(id,path);
+      }
+      for(const {stig,document} of indexes){
+        if(document.format!=="scap-ng-editor-stig-index/1"||document.stig_id!==stig.id||
+          !Array.isArray(document.rules)||document.rules.length!==stig.rule_count)throw Error("Incomplete STIG Rule index");
+        const distinct=new Set();
+        for(const rule of document.rules){
+          if(distinct.has(rule.id)||!safeCatalogPath(rule.rule_path))throw Error("Duplicate Rule or invalid Rule source");
+          distinct.add(rule.id);
+          const automated=rule.assessment_choices?.automated;
+          const aid=automated?.id||undefined,exists=!!(aid&&paths.has(aid));
+          const manual=rule.assessment_choices?.manual;
+          entries.push({
+            id:rule.id,title:rule.title,severity:rule.severity,version:rule.version,aliases:[],
+            stig:{key:stig.id,name:stig.name},
+            aid,linked:undefined,
+            status:aid?(exists?"automated":"needs-review"):"not-automated",
+            reason:aid&&!exists?"Automated Assessment source not indexed: "+aid:"",
+            fromCatalog:true,ruleSource:rule.rule_path,
+            manualId:manual?.id||undefined,manualSource:manual?.path||undefined,
+            assessmentSource:exists?paths.get(aid):undefined
+          });
+        }
+      }
+      if(entries.length!==manifest.rule_count)throw Error("Catalog count mismatch");
+      catalogAssessmentPaths=paths;
+      catalogRuleRows=entries;
+      catalogStatus="Complete pinned preview loaded: "+entries.length+" Rules across "+indexes.length+" STIGs.";
+    }catch(err){
+      catalogRuleRows=[];catalogAssessmentPaths=new Map();
+      catalogStatus="Complete STIG catalog unavailable: "+err.message+". Using six pinned examples.";
+    }
+  }
+  async function loadAssessmentById(id,seen=new Set()){
+    if(seen.has(id))return;
+    seen.add(id);
+    if(seen.size>80)throw Error("Referenced Assessment closure exceeds demo safety limit.");
+    const path=catalogAssessmentPaths.get(id);
+    if(!path)throw Error("Referenced Assessment not indexed: "+id);
+    if(!docs.has("assessment:"+id)){
+      const data=await fetchCatalogText(path),found=parse(data);
+      if(found.kind!=="assessment"||found.id!==id)throw Error("Assessment identity mismatch: "+id);
+      addDoc(path.split("/").pop(),data,"Pinned full STIG catalog",false,path.replace(/^complete-stigs\/authoring\//,""));
+    }
+    const a=docs.get("assessment:"+id).tree.assessment;
+    const deps=new Set();
+    const gather=node=>{
+      if(!node||typeof node!=="object")return;
+      if(Array.isArray(node)){for(const n of node)gather(n);return}
+      if(typeof node.assessment==="string")deps.add(node.assessment);
+      for(const [key,val] of Object.entries(node))if(key!=="assessment"&&val&&typeof val==="object")gather(val);
+    };
+    gather(a.evaluate);gather(a.applicability);
+    for(const entry of Object.values(a.dependencies||{}))if(typeof entry?.assessment==="string")deps.add(entry.assessment);
+    for(const ref of deps)await loadAssessmentById(ref,seen);
+  }
+  async function loadCatalogRule(r){
+    if(!r.fromCatalog)return;
+    if(!docs.has("rule:"+r.id)){
+      const data=await fetchCatalogText(r.ruleSource),found=parse(data);
+      if(found.kind!=="rule"||found.id!==r.id)throw Error("Rule identity mismatch: "+r.id);
+      addDoc(r.id+".rule.yaml",data,"Pinned full STIG catalog",false,r.ruleSource.replace(/^complete-stigs\/authoring\//,""));
+    }
+    if(r.aid)await loadAssessmentById(r.aid);
+    else if(r.manualId)await loadAssessmentById(r.manualId);
+  }
   function indexRules(){
     ruleRows=[...docs.values()].filter(d=>d.kind==="rule").map(d=>{
       let r=d.tree.rule,aid=r.assessment_choices?.automated?.assessment;
@@ -132,7 +227,10 @@
       const closure=aid?assessmentReferenceClosure(aid):null;
       let status=closure?(closure.ready?"automated":"needs-review"):"not-automated";
       return {id:String(r.id),title:String(r.title||r.id),severity:String(r.severity||"unknown"),version:r.version||"",aliases:(r.identifiers||[]).map(x=>x.value).filter(Boolean),aid,linked,status,reason:closure?.reason||"",stig:stigForRule(d)};
-    }).sort((a,b)=>a.id.localeCompare(b.id));
+    });
+    const merged=new Map(catalogRuleRows.map(r=>[r.id,r]));
+    for(const r of ruleRows)merged.set(r.id,r);
+    ruleRows=[...merged.values()].sort((a,b)=>a.id.localeCompare(b.id));
   }
   const active=()=>ruleRows.find(r=>r.id===chosen);
   const doc=()=>active()?.linked;
@@ -185,7 +283,27 @@
     });
     $("rules").querySelectorAll("[data-id]").forEach(b=>b.onclick=()=>open(b.dataset.id));
   }
-  function open(id){chosen=id;expandedStig=ruleRows.find(r=>r.id===id)?.stig.key||null;selectedTest=null;view="graphical";step=0;dirtySource=false;library();render()}
+  async function open(id){
+    chosen=id;expandedStig=ruleRows.find(r=>r.id===id)?.stig.key||null;
+    selectedTest=null;view="graphical";step=0;dirtySource=false;
+    library();
+    const requested=ruleRows.find(r=>r.id===id);
+    if(requested?.fromCatalog){
+      $("title").textContent=requested.title;
+      $("content").innerHTML='<section class="card"><h3>Loading selected Rule</h3><p>Retrieving its pinned source and linked Assessment.</p></section>';
+      try{
+        await loadCatalogRule(requested);
+        if(chosen!==id)return;
+        indexRules();
+      }catch(err){
+        if(chosen!==id)return;
+        $("content").innerHTML='<section class="card"><h3>Source could not be loaded</h3><p>'+esc(err.message)+'</p><p>Other Rules are still available.</p></section>';
+        display("Rule load error: "+err.message,true);return;
+      }
+    }
+    if(chosen!==id)return;
+    library();render();
+  }
   function tabs(){
     $("tabs").querySelectorAll("[data-view]").forEach(e=>{e.classList.toggle("selected",e.dataset.view===view);e.disabled=!doc()});
     $("export").disabled=!doc();$("original").disabled=!doc();
@@ -742,9 +860,9 @@
     }));
     let failures=[];
     for(const item of got){if(item.err){failures.push(item.err);continue}try{addDoc(item.name,item.text,"Pinned source "+snap.slice(0,10),false,item.path)}catch(e){failures.push(item.name+": "+e.message)}}
-    await capabilityLoad;
+    await Promise.all([capabilityLoad,loadCompleteCatalog()]);
     readState();indexRules();chosen=null;expandedStig=null;library();render();
-    display(failures.length?"Only "+(got.length-failures.length)+" examples loaded; import local YAML to continue. "+failures[0]:"Loaded "+ruleRows.length+" pinned Rules and linked Assessments. Choose one to review.",!!failures.length);
+    display(catalogStatus+(failures.length?" Some sample fixtures unavailable: "+failures[0]:""),!!failures.length);
   }
   init();
 })();
