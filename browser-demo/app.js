@@ -318,6 +318,8 @@
     if(value===undefined||value===null)return "";
     const enc=encodeURIComponent(JSON.stringify(path));
     const v=String(value);
+    if(Array.isArray(opts)&&opts===levels&&!levels.includes(v))
+      return '<div class="property"><label>'+esc(name)+'</label><p class="help">Special authored requirement: <code>'+esc(v)+'</code>. Use Source for this unsupported quick-edit option.</p></div>';
     const optionLabel=x=>levels.includes(x)?requirementDescription(x)+" ("+x+")":
       ["all","any","none","one"].includes(x)?({all:"All conditions must match",any:"At least one condition must match",none:"No conditions may match",one:"Exactly one condition must match"}[x])+" ("+x+")":x.replaceAll("_"," ");
     const choice=Array.isArray(opts)?'<select data-field="'+enc+'" aria-label="'+esc(name)+'">'+[...new Set([v,...opts])].map(x=>'<option value="'+esc(x)+'" '+(x===v?"selected":"")+'>'+esc(optionLabel(x))+'</option>').join("")+'</select>':'<input type="text" data-field="'+enc+'" value="'+esc(v)+'" aria-label="'+esc(name)+'">';
@@ -599,8 +601,10 @@
   }
   function requirementSelect(path,value,description){
     if(value===undefined||value===null)return '<p class="warning">No authored '+esc(description)+' option. Use detailed source editing; none is assumed.</p>';
+    if(!levels.includes(value))
+      return '<p class="help">Special authored requirement: <code>'+esc(value)+'</code>. Use Source for this option; the editor cannot safely offer alternative quick choices.</p>';
     const enc=encodeURIComponent(JSON.stringify(path));
-    const options=[...new Set([value,...levels])].map(k=>'<option value="'+esc(k)+'" '+(k===value?"selected":"")+'>'+esc(shortRequireChoice(k))+'</option>').join("");
+    const options=levels.map(k=>'<option value="'+esc(k)+'" '+(k===value?"selected":"")+'>'+esc(shortRequireChoice(k))+'</option>').join("");
     return '<select class="quick-require-select" data-field="'+enc+'" aria-label="'+esc(description)+'">'+options+'</select>';
   }
   function replaceSimpleOperator(tree,base,newOp){
