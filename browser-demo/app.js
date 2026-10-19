@@ -263,7 +263,7 @@
       grouped.get(r.stig.key).rules.push(r);
     }
     const groups=[...grouped.values()].sort((a,b)=>a.stig.name.localeCompare(b.stig.name));
-    $("counter").textContent=groups.length+" STIGs · "+matches.length+" of "+ruleRows.length+" loaded Rules · partial catalog";
+    $("counter").textContent=groups.length+" STIGs · "+matches.length+" of "+ruleRows.length+" loaded Rules · pre-alpha research corpus";
     $("rules").innerHTML=groups.length?groups.map(({stig,rules})=>{
       const expanded=expandedStig===stig.key;
       const automated=rules.filter(r=>r.status==="automated").length;
@@ -835,7 +835,7 @@
   function render(){
     const r=active();tabs();
     if(!r){$("crumb").textContent="LOCAL BROWSER WORKSPACE";$("title").textContent="SCAP-NG Assessment Studio";$("content").innerHTML='<section class="card"><h3>Select a STIG, then a Rule</h3><p>Expand a STIG on the left to view its Rules. No scanner is connected.</p></section>';return}
-    $("crumb").textContent=r.id+' · '+(r.version||"source revision not specified");
+    $("crumb").textContent=r.stig.name+" / "+r.id+" · "+(r.version||"source revision not specified");
     $("title").textContent=r.title;
     $("state").textContent="No scanner connected";
     const d=doc();
