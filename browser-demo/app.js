@@ -1249,13 +1249,13 @@
     const m=guidedMaps.get(capability);
     return m?.native?.state_value_enums?.[field]||null;
   }
-  function genericValue(type,value,capability="unix.file",field=""){
+  function genericValue(type,value,capability="unix.file",field="",inputId="generic-value"){
     const enums=guidedValueEnums(capability,field);
-    if(Array.isArray(enums)&&enums.length)return '<select id="generic-value">'+
+    if(Array.isArray(enums)&&enums.length)return '<select '+(inputId?'id="'+esc(inputId)+'"':"")+'>'+
       enums.map(x=>'<option value="'+esc(x)+'" '+(String(value)===x?"selected":"")+'>'+esc(x.replaceAll("_"," "))+'</option>').join("")+'</select>';
-    if(type==="boolean")return '<select id="generic-value">'+
+    if(type==="boolean")return '<select '+(inputId?'id="'+esc(inputId)+'"':"")+'>'+
       ["false","true"].map(x=>'<option value="'+x+'" '+(String(value)===x?"selected":"")+'>'+x+'</option>').join("")+'</select>';
-    return '<input id="generic-value" type="'+(type==="integer"?"number":"text")+'" value="'+esc(value??(type==="integer"?0:""))+'" '+(type==="integer"?'step="1"':"")+' required>';
+    return '<input '+(inputId?'id="'+esc(inputId)+'"':"")+' type="'+(type==="integer"?"number":"text")+'" value="'+esc(value??(type==="integer"?0:""))+'" '+(type==="integer"?'step="1"':"")+' required>';
   }
   function genericTypedValue(field,raw,capability="unix.file"){
     const type=genericSupportedField(capability,field);
@@ -1559,12 +1559,12 @@
       const refresh=()=>{
         const cap=doc()?.tree.assessment.tests[id]?.capability;
         const type=genericSupportedField(cap,choice.value),enums=guidedValueEnums(cap,choice.value);
-        host.innerHTML=genericValue(type,type==="boolean"?false:type==="integer"?0:enums?.[0]||"",cap,choice.value);
+        host.innerHTML=genericValue(type,type==="boolean"?false:type==="integer"?0:enums?.[0]||"",cap,choice.value,null);
       };
       choice.onchange=refresh;refresh();
       form.onsubmit=e=>{
         e.preventDefault();
-        const field=choice.value,value=form.querySelector("#generic-value")?.value;
+        const field=choice.value,value=host.querySelector("input,select")?.value;
         genericChange(a=>{
           const t=a.tests[id];
           if(t.capability==="independent.textfilecontent54")throw Error("Text check uses an independently selected line.");
