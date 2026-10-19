@@ -917,6 +917,148 @@
       '</section>'+inspector(a,selectedTest,refs)+'</div>'+
       '<section class="card"><h3>Future sample evaluation — placement only</h3><p class="help">The future tested SCAP-NG interpreter will take supplied Items / field values and source statuses, then explain six-state outcomes for each Test and branch. Evaluation is not connected; no result is inferred here.</p><button class="button" disabled>Enter sample evidence (not connected)</button> <button class="button" disabled>Evaluate with scanner (not connected)</button></section>';
   }
+
+  // The Guided authoring vocabulary is deliberately task-first. This bounded
+  // authoring preset emits the current 0.4-A base schema, NOT experimental B.
+  // It does not simulate a scanner or assert full-file banner equivalence.
+  const BANNER_TEST="rhel-login-banner-required-line-test";
+  const linePattern=value=>"^"+Array.from(value).map(c=>".*+?^$()[]{}|\\".includes(c)?"\\"+c:c).join("")+"$";
+  function buildBannerAssessment(id,title,filePath,requiredLine){
+    if(!/^[a-z0-9]+(?:[a-z0-9.-]*[a-z0-9])?$/.test(id))throw Error("Use a meaningful lowercase Assessment ID (letters, digits, periods and hyphens).");
+    if(docs.has("assessment:"+id))throw Error("Assessment ID already exists in My Assessments or the library.");
+    if(!title.trim())throw Error("Enter a short description of the requirement.");
+    if(!filePath.startsWith("/")||filePath.length<2||filePath.includes("\n"))throw Error("Specify an absolute Linux file path.");
+    if(!requiredLine.trim()||/[\r\n]/.test(requiredLine))throw Error("Enter one nonempty line of required text (no line breaks).");
+    return {assessment:{
+      id,version:1,assessment_title:title.trim(),mode:"automated",class:"compliance",purpose:"assessment",
+      specification:{id:"scap-ng.pre-alpha.assessment",version:"0.4.0"},
+      tests:{[BANNER_TEST]:{
+        test_title:"Login banner file contains the required line",
+        capability:"independent.textfilecontent54",
+        object:{
+          capability:"independent.textfilecontent54",
+          select:{
+            full_path:{equals:filePath},
+            pattern:{matches_regex:linePattern(requiredLine)},
+            instance:{greater_than_or_equal:1}
+          },
+          filesystem:"all",
+          collect:{ignore_case:false,multiline:true,singleline:false,item_creation:"all_object_elements_fullfilled"}
+        },
+        states:[{text:{equals:requiredLine,require:"at_least_one_exists_and_all_match"}}],
+        require:"at_least_one_exists_and_all_match",
+        reported_elements:"all"
+      }},
+      evaluate:{test:BANNER_TEST}
+    }};
+  }
+  function renderStandaloneCreation(){
+    $("crumb").textContent="MY ASSESSMENTS / NEW";$("title").textContent="New Assessment";
+    $("state").textContent="Draft · no scanner";
+    $("notice").textContent="Not linked to a STIG or Rule. Author a standalone text-file check against the pinned 0.4-A base draft.";
+    $("content").innerHTML='<section class="card"><h3>Create an Assessment without a STIG</h3>'+
+      '<p>First describe what to check. Then use Guided to review and change every choice.</p>'+
+      '<form id="standalone-create" class="standalone-create">'+
+      '<label for="create-id">Assessment ID</label><input name="id" id="create-id" required value="custom.rhel-login-banner-required-line" spellcheck="false">'+
+      '<label for="create-title">What must be true?</label><input name="title" id="create-title" required value="The RHEL login banner must contain the required notice">'+
+      '<label for="create-file">Which file should be read?</label><input name="file" id="create-file" required value="/etc/issue" spellcheck="false">'+
+      '<p class="help">/etc/issue is a common local login-banner file. It does not automatically prove which banner is shown by SSH or another login service.</p>'+
+      '<label for="create-line">What exact line must appear? (user-defined)</label><textarea name="line" id="create-line" required rows="3" spellcheck="false" placeholder="Type the required text."></textarea>'+
+      '<p class="help">This initial preset requires at least one complete matching line; it does not compare the entire file or render escape sequences.</p>'+
+      '<button class="button primary" type="submit">Create draft and open Guided →</button></form>'+
+      '<p class="help" id="create-error" role="alert"></p></section>';
+    $("standalone-create").onsubmit=e=>{
+      e.preventDefault();
+      const form=e.currentTarget;
+      try{
+        const a=buildBannerAssessment(form.elements.namedItem("id").value.trim(),
+          form.elements.namedItem("title").value,
+          form.elements.namedItem("file").value,
+          form.elements.namedItem("line").value);
+        const raw=jsyaml.dump(a,{lineWidth:105,noRefs:true});
+        const p=parse(raw);
+        addDoc(p.id+".assessment.yaml",raw,"Locally created draft");
+        docs.get("assessment:"+p.id).changed=true;
+        standaloneId=p.id;creatingStandalone=false;chosen=null;step=0;view="guided";
+        saveState();library();render();
+        display("Standalone Assessment created as a local draft. No scanner has verified it.");
+      }catch(err){$("create-error").textContent=err.message;display(err.message,true)}
+    };
+  }
+  function bannerParts(){
+    const a=doc()?.tree.assessment,t=a?.tests?.[BANNER_TEST],obj=t?.object;
+    return {a,t,obj,line:t?.states?.[0]?.text?.equals,
+      path:obj?.select?.full_path?.equals};
+  }
+  function standaloneWizard(){
+    const {a,t,obj,line,path}=bannerParts();
+    if(!a||!t||!obj||typeof line!=="string")
+      return '<section class="card"><h3>Source was changed</h3><p>This no longer matches the guided single-line text preset. Source editing is still available.</p><button id="gotoSource" class="button">Review Source</button></section>';
+    const steps=["Describe","Find the file","Required text","Decide success","Review"];
+    const nav='<div class="steps">'+steps.map((name,i)=>'<button data-step="'+i+'" class="'+(step===i?"selected":"")+'">'+(i+1)+'. '+name+'</button>').join("")+'</div>';
+    let content="";
+    if(step===0)content='<section class="card"><h3>1 · What are we checking?</h3>'+
+      field(["assessment","assessment_title"],"Requirement (plain English)",a.assessment_title)+
+      field(["assessment","id"],"Assessment identifier",a.id)+
+      '<p class="help">An independent automated Assessment. It can be reused or linked to a Rule later, without a dummy STIG.</p>'+
+      '</section>';
+    if(step===1)content='<section class="card"><h3>2 · Where should we look?</h3>'+
+      '<p><strong>Read a text file</strong> on RHEL using the textfilecontent54 capability.</p>'+
+      field(["assessment","tests",BANNER_TEST,"object","select","full_path","equals"],"File to inspect",path)+
+      '<p class="help">Choose the exact file; this check does not search other directories.</p>'+
+      field(["assessment","tests",BANNER_TEST,"object","filesystem"],"Filesystem scope",obj.filesystem,["all","local","same"])+
+      '<p class="help">All = no local filesystem restriction (inherited OVAL default). Local restricts to local filesystems. Same means the filesystem containing the selected path. Choose explicitly; no silent conversion.</p></section>';
+    if(step===2)content='<section class="card"><h3>3 · What text must be present?</h3>'+
+      '<label for="banner-line">Exact required line</label><textarea rows="3" id="banner-line" spellcheck="false">'+esc(line)+'</textarea>'+
+      '<p class="help">The editor escapes regular-expression punctuation when constructing the collection pattern. It checks one complete matching line, not the entire banner text.</p>'+
+      '<details><summary>Show the generated search pattern</summary><code>'+esc(obj.select?.pattern?.matches_regex||"")+'</code></details></section>';
+    if(step===3)content='<section class="card"><h3>4 · When should this check succeed?</h3>'+
+      '<p><strong>At least one line must be found, and all selected matching lines must satisfy the expected text.</strong></p>'+
+      field(["assessment","tests",BANNER_TEST,"require"],"Number of matching lines required",t.require,
+        ["at_least_one_exists_and_all_match","at_least_one_exists_and_some_match","only_one_exists_and_matches"])+
+      field(["assessment","tests",BANNER_TEST,"states",0,"text","require"],"Required text values per line",t.states[0].text.require,
+        ["at_least_one_exists_and_all_match","at_least_one_exists_and_some_match"])+
+      '<details><summary>Advanced: how text is collected</summary><div class="structure-children">'+
+      field(["assessment","tests",BANNER_TEST,"object","collect","ignore_case"],"Ignore case",obj.collect.ignore_case,["true","false"])+
+      field(["assessment","tests",BANNER_TEST,"object","collect","multiline"],"Match line boundaries",obj.collect.multiline,["true","false"])+
+      field(["assessment","tests",BANNER_TEST,"object","collect","singleline"],"Allow dot to match newline",obj.collect.singleline,["true","false"])+
+      field(["assessment","tests",BANNER_TEST,"object","collect","item_creation"],"When to create collected items",obj.collect.item_creation,["all_object_elements_fullfilled","filepath_exists"])+
+      '</div></details></section>';
+    if(step===4)content='<section class="card"><h3>5 · Review the new Assessment</h3>'+
+      '<p><strong>Where:</strong> '+esc(path)+'</p><p><strong>Required complete line:</strong> '+esc(line)+'</p>'+
+      '<p><strong>Success rule:</strong> '+esc(requirementDescription(t.require))+'</p>'+
+      '<p><strong>Not scanner-verified:</strong> No real RHEL host was inspected. Schema/reference diagnostics and native evaluation are not connected.</p>'+
+      '<details><summary>See source representation</summary><pre>'+esc(doc().source)+'</pre></details></section>';
+    return nav+content+'<div class="actions">'+(step>0?'<button id="prev" class="button">Previous</button>':"")+
+      (step<4?'<button id="next" class="button primary">Next →</button>':'<button id="gotoSource" class="button primary">Review YAML Source</button>')+
+      '<button id="gotoGraph" class="button">Graphical overview</button></div>';
+  }
+  function standaloneOverview(){
+    const {line,path}=bannerParts();
+    return '<section class="card"><h3>What this check means</h3>'+
+      '<p><strong>Look at:</strong> '+esc(path||"the authored file")+'</p>'+
+      '<p><strong>Find:</strong> a complete line matching '+esc(line??"the authored text")+'</p>'+
+      '<p><strong>Require:</strong> at least one selected line to exist and match.</p>'+
+      '<p class="help">No STIG association. The Source tab exposes the full native Assessment. No scanner result is available.</p>'+
+      '</section>'+overview();
+  }
+  function bindStandaloneEditors(){
+    const editor=$("banner-line");if(!editor)return;
+    editor.onchange=()=>{
+      const textValue=editor.value;
+      if(!textValue.trim()||/[\r\n]/.test(textValue)){display("Enter one nonempty line of required text.",true);render();return}
+      const d=doc(),p=bannerParts(),previous=structuredClone(d.tree);
+      if(!p.t?.object?.select?.pattern||!p.t?.states?.[0]?.text){display("This draft no longer has a matching text field.",true);return}
+      try{
+        p.t.object.select.pattern.matches_regex=linePattern(textValue);
+        p.t.states[0].text.equals=textValue;
+        d.source=jsyaml.dump(d.tree,{lineWidth:105,noRefs:true});
+        parse(d.source);d.changed=true;saveState();render();
+        display("Required line and escaped search pattern updated together; review YAML before export.");
+      }catch(err){d.tree=previous;display(err.message,true);render()}
+    };
+  }
+
   function wizard(){
     const a=doc().tree.assessment,tests=Object.entries(a.tests||{});
     const names=["Purpose","Collect data","What must match","Combine checks","Example data (future)"];
