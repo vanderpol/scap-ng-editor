@@ -1294,7 +1294,11 @@
       !(capability==="windows.registry"&&name==="value")&&genericSupportedField(capability,name));
   };
   function genericFieldOptions(selected,capability="unix.file"){
-    return guidedStateFields(capability).map(name=>'<option value="'+esc(name)+'" '+(selected===name?"selected":"")+'>'+esc(name.replaceAll("_"," "))+'</option>').join("");
+    return guidedStateFields(capability).map(name=>{
+      const label=capability==="windows.registry"?
+        guidedRegistryLabel("state_fields",name,name.replaceAll("_"," ")):name.replaceAll("_"," ");
+      return '<option value="'+esc(name)+'" '+(selected===name?"selected":"")+'>'+esc(label)+'</option>';
+    }).join("");
   }
   function guidedValueEnums(capability,field){
     const m=guidedMaps.get(capability);
@@ -1513,7 +1517,8 @@
             '<select aria-label="Expected '+esc(name)+'" data-generic-state="'+esc(id)+'" data-index="'+index+'">'+
             choices.map(v=>'<option value="'+esc(v)+'" '+(String(p.equals)===v?"selected":"")+'>'+esc(String(v).replaceAll("_"," "))+'</option>').join("")+'</select>':
             '<input aria-label="Expected '+esc(name)+'" type="'+(type==="integer"?"number":"text")+'" data-generic-state="'+esc(id)+'" data-index="'+index+'" value="'+esc(p.equals)+'" '+(type==="integer"?'step="1"':"")+'>';
-          return '<div class="generic-state-row"><strong>'+esc(name.replaceAll("_"," "))+'</strong>'+
+          const fieldLabel=isRegistry?guidedRegistryLabel("state_fields",name,name.replaceAll("_"," ")):name.replaceAll("_"," ");
+          return '<div class="generic-state-row"><strong>'+esc(fieldLabel)+'</strong>'+
             '<div>'+editor+'</div>'+
             '<button class="button" data-generic-remove-state="'+esc(id)+'" data-index="'+index+'" '+(t.states.length<=1?"disabled":"")+' title="Remove this expected field">Remove</button></div>';
         }).join("")+
@@ -1581,7 +1586,8 @@
       '<div id="generic-field-group" class="generic-dynamic" hidden>'+
       '<label for="generic-field" id="generic-field-label">Which collected property must match?</label>'+
       '<select id="generic-field">'+genericFieldOptions()+'</select>'+
-      '<label for="generic-value">Required field value</label><div id="generic-new-value-host"></div></div>'+
+      '<label for="generic-value">Required field value</label><div id="generic-new-value-host"></div>'+
+      '<p id="generic-registry-type-help" class="help" hidden></p></div>'+
       '<button type="submit" class="button primary" '+(addDisabled?"disabled":"")+'>+ Add check</button>'+
       '<p id="generic-error" role="alert" class="warning"></p></form></section>'+
       (entries.length?'<section class="card"><h3>Review the composed Assessment</h3>'+
@@ -1601,6 +1607,13 @@
       $("generic-line-group").hidden=!isText;
       $("generic-field-group").hidden=isText;
       $("generic-registry-group").hidden=!isRegistry;
+      const registryHelp=$("generic-registry-type-help");
+      registryHelp.hidden=!isRegistry;
+      if(isRegistry){
+        const m=guidedMaps.get("windows.registry");
+        const choices=m?.native?.field_datatypes?.value||[];
+        registryHelp.textContent="Registry storage type (type) uses the exact pinned enum dropdown. Comparing the stored value is not yet supported here: its "+choices.length+" eligible datatypes ("+choices.join(", ")+") require an explicit compatible datatype selector and validation.";
+      }
       $("generic-line").required=isText;
       $("generic-registry-name").required=isRegistry;
       $("generic-path-label").textContent=isRegistry?"Windows Registry key":"Absolute Linux file or link to inspect";
