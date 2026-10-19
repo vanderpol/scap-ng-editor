@@ -23,6 +23,7 @@
   let docs=new Map(),ruleRows=[],chosen=null,selectedTest=null,view="graphical",step=0,filter="all",search="",message="",dirtySource=false;
   // Only one STIG can reveal its Rules. Others have no Rule DOM nodes.
   let expandedStig=null;
+  const stigScrollPositions=new Map();
   // Catalog metadata is separate from loaded/editable documents (lazy Rule/Assessment fetch).
   let catalogRuleRows=[],catalogBase="",catalogAssessmentPaths=new Map(),catalogStatus="";
   const catalogConfig=window.SCAPNG_COMPLETE_CATALOG||null;
@@ -244,6 +245,11 @@
     return '<span class="tag orange">No automation link in loaded Rule</span>';
   }
   function library(){
+    for(const section of $("rules").querySelectorAll(".stig-group")){
+      const key=section.querySelector("[data-stig]")?.dataset.stig;
+      const list=section.querySelector(".stig-rules");
+      if(key&&list)stigScrollPositions.set(key,list.scrollTop);
+    }
     const choices=[["all","All"],["automated","Automated"],["not-automated","Without automated choice"],["needs-review","Assessment not loaded"],["candidates","Candidates"]];
     $("filters").innerHTML=choices.map(([v,name])=>'<button class="'+(filter===v?"selected":"")+'" data-filter="'+v+'">'+name+'</button>').join("");
     $("filters").querySelectorAll("[data-filter]").forEach(b=>b.onclick=()=>{
@@ -278,12 +284,31 @@
             '</button>').join("")+'</div>':"")+
         '</section>';
     }).join(""):'<div class="empty">No matching loaded Rules.<p>Import a Rule and its Assessment to expand this library.</p></div>';
+    for(const section of $("rules").querySelectorAll(".stig-group")){
+      const key=section.querySelector("[data-stig]")?.dataset.stig;
+      const list=section.querySelector(".stig-rules");
+      if(key&&list)list.scrollTop=stigScrollPositions.get(key)||0;
+    }
     $("rules").querySelectorAll("[data-stig]").forEach(b=>b.onclick=()=>{
       expandedStig=expandedStig===b.dataset.stig?null:b.dataset.stig;
       chosen=null;selectedTest=null;
       library();render();
     });
     $("rules").querySelectorAll("[data-id]").forEach(b=>b.onclick=()=>open(b.dataset.id));
+  }
+  function ruleNavigation(r){
+    const same=ruleRows.filter(x=>x.stig.key===r.stig.key);
+    const pos=same.findIndex(x=>x.id===r.id);
+    if(pos<0)return "";
+    const prev=same[pos-1],next=same[pos+1];
+    return '<nav class="rule-navigation" aria-label="Browse STIG Rules">'+
+      '<button class="button" data-nav-rule="'+esc(prev?.id||"")+'" '+(prev?"":"disabled")+'>← Previous Rule</button>'+
+      '<span>Rule '+(pos+1)+' of '+same.length+'</span>'+
+      '<button class="button" data-nav-rule="'+esc(next?.id||"")+'" '+(next?"":"disabled")+'>Next Rule →</button>'+
+      '</nav>';
+  }
+  function bindRuleNavigation(){
+    $("content").querySelectorAll("[data-nav-rule]").forEach(b=>b.onclick=()=>{if(b.dataset.navRule)open(b.dataset.navRule)});
   }
   async function open(id){
     chosen=id;expandedStig=ruleRows.find(r=>r.id===id)?.stig.key||null;
@@ -904,7 +929,8 @@
       const manual=manualDoc();
       if(manual){
         $("notice").textContent="Manual Assessment from pinned source · scanner not connected.";
-        $("content").innerHTML=view==="source"?'<div class="card"><h3>Manual YAML source</h3><textarea id="rawyaml" class="editor" spellcheck="false">'+esc(manual.source)+'</textarea><div class="actions"><button id="applyYAML" class="button primary">Apply YAML</button><span id="rawStatus" class="help">Draft source</span></div></div>':showManualAssessment(r,manual);
+        $("content").innerHTML=ruleNavigation(r)+(view==="source"?'<div class="card"><h3>Manual YAML source</h3><textarea id="rawyaml" class="editor" spellcheck="false">'+esc(manual.source)+'</textarea><div class="actions"><button id="applyYAML" class="button primary">Apply YAML</button><span id="rawStatus" class="help">Draft source</span></div></div>':showManualAssessment(r,manual));
+        bindRuleNavigation();
         const editor=$("manual-procedure");
         if(editor)editor.onchange=()=>{
           const previous=manual.tree.assessment.procedure;
@@ -931,7 +957,8 @@
     }
     $("notice").textContent=(r.status==="needs-review"?r.reason+" · ":"")+"Imported source: "+d.origin+" · Draft-only. No authoritative schema verification or scanner evaluation.";
     let html=view==="guided"?wizard():view==="graphical"?overview():view==="source"?sourceView():view==="split"?'<div class="split"><div>'+overview()+'</div>'+rawEditor()+'</div>':fixtures();
-    $("content").innerHTML=html;
+    $("content").innerHTML=ruleNavigation(r)+html;
+    bindRuleNavigation();
     $("content").querySelectorAll("[data-select-test]").forEach(b=>b.onclick=()=>{selectedTest=b.dataset.selectTest;render();if(innerWidth<780)$("test-inspector")?.scrollIntoView({block:"start"})});
     $("content").querySelectorAll("[data-step]").forEach(b=>b.onclick=()=>{step=Number(b.dataset.step);render()});
     $("content").querySelectorAll("[data-field]").forEach(e=>e.onchange=()=>{
