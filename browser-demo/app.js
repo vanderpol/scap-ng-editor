@@ -1355,33 +1355,36 @@
       '<p>This Assessment contains a more advanced or inconsistent expression than the bounded Guided authoring builder can safely edit. Source is preserved.</p>'+
       '<button id="gotoSource" class="button">Inspect YAML</button></section>';
     const caps=[["independent.textfilecontent54","Find text in a Linux file"],
-                ["unix.file","Inspect Linux file owner/permissions"]];
+                ["unix.file","Inspect Linux file owner/permissions"],
+                ["unix.symlink","Inspect a Unix symbolic link target"],
+                ["windows.registry","Inspect a Windows Registry entry"]];
     const capabilities=caps.filter(([key])=>guidedMaps.has(key));
     const capList=capabilities.map(([key,name])=>'<option value="'+esc(key)+'">'+esc(name)+' — '+esc(key)+'</option>').join("");
     const op=a.evaluate?.any?"any":"all";
     const testRows=entries.map(([id,t],i)=>{
-      const path=t.object.select.full_path.equals,isText=t.capability==="independent.textfilecontent54";
+      const path=guidedLocator(t),isText=t.capability==="independent.textfilecontent54",
+        isRegistry=t.capability==="windows.registry";
       const details=isText?'<label>Complete required line (textfilecontent54)</label>'+
         '<textarea rows="2" data-generic-line="'+esc(id)+'">'+esc(t.states[0]?.text?.equals??"")+'</textarea>'+
         '<p class="help">One independent Test checks one required line. Add a separate Test for another required line.</p>':
-        '<h4>What must be true of the same collected file?</h4>'+
+        '<h4>What must be true of the same collected '+(isRegistry?"registry entry":isText?"line":"file or link")+'?</h4>'+
         t.states.map((entry,index)=>{
           const name=Object.keys(entry)[0],p=entry[name],type=genericSupportedField(t.capability,name);
+          const choices=guidedValueEnums(t.capability,name)||(type==="boolean"?["true","false"]:null);
+          const editor=choices?
+            '<select aria-label="Expected '+esc(name)+'" data-generic-state="'+esc(id)+'" data-index="'+index+'">'+
+            choices.map(v=>'<option value="'+esc(v)+'" '+(String(p.equals)===v?"selected":"")+'>'+esc(String(v).replaceAll("_"," "))+'</option>').join("")+'</select>':
+            '<input aria-label="Expected '+esc(name)+'" type="'+(type==="integer"?"number":"text")+'" data-generic-state="'+esc(id)+'" data-index="'+index+'" value="'+esc(p.equals)+'" '+(type==="integer"?'step="1"':"")+'>';
           return '<div class="generic-state-row"><strong>'+esc(name.replaceAll("_"," "))+'</strong>'+
-            '<div>'+(
-              type==="boolean"?
-                '<select aria-label="Expected '+esc(name)+'" data-generic-state="'+esc(id)+'" data-index="'+index+'">'+
-                ["true","false"].map(v=>'<option value="'+v+'" '+(String(p.equals)===v?"selected":"")+'>'+v+'</option>').join("")+'</select>':
-                '<input aria-label="Expected '+esc(name)+'" type="'+(type==="integer"?"number":"text")+'" data-generic-state="'+esc(id)+'" data-index="'+index+'" value="'+esc(p.equals)+'" '+(type==="integer"?'step="1"':"")+'>'
-            )+'</div>'+
+            '<div>'+editor+'</div>'+
             '<button class="button" data-generic-remove-state="'+esc(id)+'" data-index="'+index+'" '+(t.states.length<=1?"disabled":"")+' title="Remove this expected field">Remove</button></div>';
         }).join("")+
         (t.states.length>1?field(["assessment","tests",id,"states_match"],
             "How conditions on this same file combine",t.states_match,["all","any","one","odd"]):"")+
         '<form class="generic-add-state" data-generic-add-state="'+esc(id)+'">'+
-        '<label>Add another condition to the SAME file</label>'+
+        '<label>Add another condition to this SAME collected '+(isRegistry?"registry entry":"Item")+'</label>'+
         '<div class="generic-cond-add"><select data-generic-field-for="'+esc(id)+'" aria-label="Expected field to add">'+
-        genericFieldOptions()+'</select><span data-generic-value-host="'+esc(id)+'"></span>'+
+        genericFieldOptions(undefined,t.capability)+'</select><span data-generic-value-host="'+esc(id)+'"></span>'+
         '<button type="submit" class="button">+ Add condition</button></div></form>';
       return '<section class="card generic-check"><div class="generic-check-top">'+
         '<h3>Check '+(i+1)+' · '+esc(t.test_title)+'</h3>'+
@@ -1390,15 +1393,18 @@
         '<div class="generic-check-fields">'+
         '<div><label>Check description</label><input data-field="'+encodeURIComponent(JSON.stringify(["assessment","tests",id,"test_title"]))+'" value="'+esc(t.test_title)+'"></div>'+
         '<div><label>Test ID (editable)</label><input data-generic-rename="'+esc(id)+'" value="'+esc(id)+'" spellcheck="false"></div>'+
-        '<div><label>Absolute file path</label><input data-generic-path="'+esc(id)+'" value="'+esc(path)+'" spellcheck="false"></div>'+
+        '<div><label>'+(isRegistry?"Windows Registry key":"Absolute Linux file path")+'</label><input data-generic-path="'+esc(id)+'" value="'+esc(path)+'" spellcheck="false"></div>'+
         '<div><label>Data source description</label><input data-field="'+encodeURIComponent(JSON.stringify(["assessment","tests",id,"object","object_title"]))+'" value="'+esc(t.object.object_title||"")+'"></div></div>'+
+        (isRegistry?'<div class="generic-check-fields"><div><label>Registry hive</label><select data-generic-hive="'+esc(id)+'">'+
+          (guidedMaps.get(t.capability)?.native?.selector_value_enums?.hive||[]).map(h=>'<option value="'+esc(h)+'" '+(t.object.select.hive?.equals===h?"selected":"")+'>'+esc(h.replaceAll("_"," "))+'</option>').join("")+
+          '</select></div><div><label>Named registry value</label><input data-generic-reg-name="'+esc(id)+'" value="'+esc(t.object.select.name?.equals||"")+'"></div></div>':"")+
         details+
         '<details><summary>More collection and matching details (advanced)</summary>'+
         '<p>Collected Items requirement: '+esc(t.require)+'</p>'+
         (isText?'<p>Text collection is pinned to exact complete-line search with explicit options and escaped punctuation.</p>':"")+
         '<p class="help">Detailed edits remain available through Source; no hidden semantic changes are applied.</p></details></section>';
     }).join("");
-    const addDisabled=capabilities.length!==2;
+    const addDisabled=capabilities.length!==4;
     return '<section class="card"><h3>Guided Assessment — started from your goal</h3>'+
       field(["assessment","assessment_title"],"Security requirement",a.assessment_title)+
       field(["assessment","id"],"Assessment ID",a.id)+
@@ -1422,12 +1428,19 @@
       '<input id="generic-check-id" required spellcheck="false" placeholder="audit-log-owned-by-root-test">'+
       '<label for="generic-capability">How should the data be collected?</label>'+
       '<select id="generic-capability" '+(addDisabled?"disabled":"")+'>'+capList+'</select>'+
-      '<label for="generic-path">Absolute file to inspect</label>'+
+      '<label for="generic-path" id="generic-path-label">Absolute Linux file to inspect</label>'+
       '<input id="generic-path" required spellcheck="false" placeholder="/var/log/secure">'+
+      '<div id="generic-registry-group" hidden class="generic-dynamic">'+
+      '<label for="generic-hive">Windows Registry hive</label><select id="generic-hive">'+
+      (guidedMaps.get("windows.registry")?.native?.selector_value_enums?.hive||[]).map(h=>
+        '<option value="'+esc(h)+'">'+esc(h.replaceAll("_"," "))+'</option>').join("")+
+      '</select>'+
+      '<label for="generic-registry-name">Registry value name (not the default/unnamed value)</label>'+
+      '<input id="generic-registry-name" spellcheck="false" placeholder="ExampleValue"></div>'+
       '<div id="generic-line-group" class="generic-dynamic"><label for="generic-line">Exact complete line required in the file</label>'+
       '<textarea id="generic-line" rows="2" placeholder="Required notice text"></textarea></div>'+
       '<div id="generic-field-group" class="generic-dynamic" hidden>'+
-      '<label for="generic-field">Which file property must match?</label>'+
+      '<label for="generic-field" id="generic-field-label">Which collected property must match?</label>'+
       '<select id="generic-field">'+genericFieldOptions()+'</select>'+
       '<label for="generic-value">Required field value</label><div id="generic-new-value-host"></div></div>'+
       '<button type="submit" class="button primary" '+(addDisabled?"disabled":"")+'>+ Add check</button>'+
