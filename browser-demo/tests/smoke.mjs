@@ -24,6 +24,27 @@ try {
   assert.equal(await page.locator('.stig-toggle').count(),4,'the source-backed catalog should group six Rules into four STIGs');
   for(const stig of ['rhel_9','ms_windows_11','apache_server_2-4_unix_server','ms_windows_server_dns'])
     assert.equal(await page.locator('[data-stig="'+stig+'"]').count(),1,'STIG group '+stig+' should be present');
+  await page.locator('#new-assessment').click();
+  assert(await page.locator('#standalone-create').isVisible(),'standalone creation must not require a STIG');
+  await page.locator('#create-line').fill('Authorized users only. (Example+)');
+  await page.locator('#standalone-create button[type="submit"]').click();
+  assert((await page.locator('#crumb').innerText()).includes('MY ASSESSMENTS'),'new Assessment must be independent');
+  await page.locator('[data-step="1"]').click();
+  assert.equal(await page.locator('input[aria-label="File to inspect"]').inputValue(),'/etc/issue');
+  await page.locator('[data-step="2"]').click();
+  await page.locator('#banner-line').fill('Required banner text. (Revised+)');
+  await page.locator('#banner-line').press('Tab');
+  await page.locator('[data-view="source"]').click();
+  const standaloneYaml=await page.locator('#rawyaml').inputValue();
+  const standalone=await page.evaluate(yaml=>window.jsyaml.load(yaml),standaloneYaml);
+  const standaloneTest=standalone.assessment.tests['rhel-login-banner-required-line-test'];
+  assert.equal(standaloneTest.capability,'independent.textfilecontent54');
+  assert.equal(standaloneTest.object.select.full_path.equals,'/etc/issue');
+  assert.equal(standaloneTest.states[0].text.equals,'Required banner text. (Revised+)');
+  assert(standaloneTest.object.select.pattern.matches_regex.startsWith('^Required banner text'));
+  assert.equal(standaloneTest.require,'at_least_one_exists_and_all_match');
+  assert.equal(standaloneTest.object.collect.multiline,true);
+  assert.equal(await page.locator('[data-standalone="custom.rhel-login-banner-required-line"]').count(),1);
   await page.locator('[data-filter="all"]').click();
   assert.equal(await page.locator('.stig-toggle').count(),4,'All must show STIG headings, not a flat Rule list');
   assert.equal(await page.locator('.stig-rules').count(),0,'All should not render any Rules before STIG selection');
@@ -86,7 +107,7 @@ try {
 
   await openRule('SV-257851');
   assert((await page.locator('#test-inspector .combined-check').innerText()).includes('mounted filesystem entries'), 'simple collection should use a human term');
-  assert((await page.locator('#test-inspector .combined-check').innerText()).includes('nosuid'), 'matching value and data source should be visible together');
+  assert.equal(await page.locator('#test-inspector .predicate-value').inputValue(),'nosuid','matching value should be in the editable input');
   assert.equal(await page.locator('#test-inspector .inline-predicate input[data-field]').count(), 1, 'simple field value should have a direct edit control');
   const nosuidEdit=page.locator('#test-inspector .inline-predicate input[data-field]');
   await nosuidEdit.fill('noexec');
