@@ -208,6 +208,34 @@ try {
   const recordParsed=await page.evaluate(s=>window.jsyaml.load(s),recordSource);
   assert.equal(recordParsed.assessment.tests['windows-have-tpm-ready-use-test'].states[0].value.record.fields.tpmpresent.equals,'False',
     'record value edit must map to its nested State field without changing collection');
+  const originalRecordFields=recordParsed.assessment.tests['windows-have-tpm-ready-use-test'].states[0].value.record.fields;
+  await page.locator('[data-view="graphical"]').click();
+  const recordName=page.locator('#test-inspector .record-edit-row').first().locator('input[data-rename-key]');
+  assert.equal(await recordName.inputValue(),'tpmpresent','native record member name should be an editable text field');
+  // Reject a duplicate name without touching the source document.
+  const sibling=Object.keys(originalRecordFields).find(k=>k!=='tpmpresent');
+  assert(sibling,'TPM fixture should contain a second record member');
+  await recordName.fill(sibling);
+  await recordName.press('Tab');
+  assert.equal(await page.locator('#test-inspector .record-edit-row').first().locator('input[data-rename-key]').inputValue(),'tpmpresent',
+    'duplicate rename must restore the original field name');
+  const renamed=page.locator('#test-inspector .record-edit-row').first().locator('input[data-rename-key]');
+  page.once('dialog',dialog=>dialog.accept());
+  await renamed.fill('tpm_detected');
+  await renamed.press('Tab');
+  await page.locator('[data-view="source"]').click();
+  const renamedYaml=await page.locator('#rawyaml').inputValue();
+  const renamedDoc=await page.evaluate(raw=>window.jsyaml.load(raw),renamedYaml);
+  const changedFields=renamedDoc.assessment.tests['windows-have-tpm-ready-use-test'].states[0].value.record.fields;
+  assert(!Object.hasOwn(changedFields,'tpmpresent'),'previous record key must not remain after rename');
+  assert.equal(changedFields.tpm_detected.equals,'False','field key rename must retain the original value');
+  assert.deepEqual(Object.keys(changedFields),Object.keys(originalRecordFields).map(k=>k==='tpmpresent'?'tpm_detected':k),
+    'field rename must preserve original record ordering and all sibling names');
+  for(const key of Object.keys(originalRecordFields).filter(k=>k!=='tpmpresent'))
+    assert.deepEqual(changedFields[key],originalRecordFields[key],'rename must not change a sibling record predicate');
+  await page.locator('[data-view="graphical"]').click();
+  assert.equal(await page.locator('#test-inspector .record-edit-row').first().locator('input[data-rename-key]').inputValue(),
+    'tpm_detected','graphical editor must reread the new key from the exported source');
   await openRule('SV-257798');
   assert((await page.locator('#test-inspector .quick-results').innerText()).includes('Special authored requirement: all_exist_and_all_match'),
     'unreviewed existence modes must not be mislabeled as a different mode');
