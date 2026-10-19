@@ -52,6 +52,13 @@ try {
   assert(!genericCaps.some(x=>x.includes('windows.registry')),
     'Windows Registry must not appear under the Linux target platform');
   assert.equal(await page.locator('#generic-platform').inputValue(),'linux');
+  await page.locator('#generic-platform').selectOption('windows');
+  assert.deepEqual(await page.locator('#generic-capability option').evaluateAll(es=>es.map(e=>e.value)),
+    ['windows.registry'],'changing an empty draft to Windows must rebuild available check types');
+  await page.locator('#generic-platform').selectOption('linux');
+  assert.deepEqual(await page.locator('#generic-capability option').evaluateAll(es=>es.map(e=>e.value)),
+    ['independent.textfilecontent54','unix.file','unix.symlink'],
+    'switching back to Linux before adding Tests must restore compatible options');
   assert((await page.locator('label[for="generic-capability"]').innerText()).includes('Which capability'),
     'capability prompt should use shared source terminology');
   await page.locator('#generic-check-title').fill('Audit log owned by root');
