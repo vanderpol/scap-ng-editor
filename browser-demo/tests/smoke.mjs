@@ -145,7 +145,7 @@ try {
   assert((await page.locator('#test-inspector .predicate-value').inputValue()).includes('KeepAlive Off'), 'graphical view must reflect YAML edit');
   assert((await page.locator('#test-inspector').innerText()).includes('How required values are calculated (Variables:'), 'Apache variable dependencies should be linked');
   assert((await page.locator('#test-inspector .shellcommand-panel').innerText()).includes('no fixed command string'), 'Variable-generated Apache command must not be presented as a literal');
-  assert((await page.locator('#test-inspector .shellcommand-panel').innerText()).includes('command from the Variable'), 'Apache command source must be identified');
+  assert((await page.locator('#test-inspector .shellcommand-panel').innerText()).includes('comes from the Variable'), 'Apache command source must be identified');
   assert.equal(await page.locator('#test-inspector .shellcommand-panel textarea[data-field]').count(), 0, 'Variable-generated command must not be edited as if it were literal');
   const apacheInterpreter=page.locator('#test-inspector .shellcommand-panel select.interpreter-select');
   assert.equal(await apacheInterpreter.count(), 1, 'Apache shell must be editable in-place');
