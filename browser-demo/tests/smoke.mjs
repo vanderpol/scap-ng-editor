@@ -343,6 +343,27 @@ try {
   assert((await page.locator('#manual-procedure').inputValue()).includes('dnf history'),
     'manual procedure should be directly readable and editable, not an empty automation panel');
 
+  // Desktop and Chromebook layouts should use available horizontal space.
+  // Graphical mode keeps logic navigation and the focused Test inspector
+  // side-by-side; at narrower widths they intentionally stack.
+  await openRule('SV-253495');
+  for (const size of [{width:1366,height:768},{width:1920,height:1080}]) {
+    await page.setViewportSize(size);
+    const tree=await page.locator('.graph-layout .logic-pane').boundingBox();
+    const detail=await page.locator('.graph-layout #test-inspector').boundingBox();
+    assert(tree&&detail, 'Graphical tree and detail panels must both be present on desktop');
+    assert(Math.abs(tree.y-detail.y)<10 && detail.x>=tree.x+tree.width-1,
+      size.width+'px desktop: logic tree must sit beside the editable Test inspector');
+    const noOverflow=await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+2);
+    assert(noOverflow,size.width+'px desktop layout must not overflow horizontally');
+  }
+  await page.setViewportSize({width:1024,height:768});
+  const compactTree=await page.locator('.graph-layout .logic-pane').boundingBox();
+  const compactDetail=await page.locator('.graph-layout #test-inspector').boundingBox();
+  assert(compactTree&&compactDetail && compactDetail.y>compactTree.y+compactTree.height-2,
+    'compact browser layout stacks graph navigation before the focused Test inspector');
+  await page.setViewportSize({width:1440,height:900});
+
   const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
   mobile.on('pageerror', err => jsErrors.push(err.message));
   await mobile.goto('http://127.0.0.1:8765/', { waitUntil: 'domcontentloaded' });
