@@ -20,7 +20,7 @@
     ["ms_windows_server_dns/rules/SV-259345.rule.yaml","rule"],
     ["ms_windows_server_dns/assessments/automated/SV-259345.automated.yaml","assessment"]
   ];
-  let docs=new Map(),ruleRows=[],chosen=null,selectedTest=null,view="graphical",step=0,filter="all",search="",message="",dirtySource=false;
+  let docs=new Map(),ruleRows=[],chosen=null,standaloneId=null,creatingStandalone=false,selectedTest=null,view="graphical",step=0,filter="all",search="",message="",dirtySource=false;
   // Only one STIG can reveal its Rules. Others have no Rule DOM nodes.
   let expandedStig=null;
   const stigScrollPositions=new Map();
@@ -106,7 +106,7 @@
     }catch(e){}
   }
   function saveState(){
-    try{localStorage.setItem("scapng-browser-drafts-v1",JSON.stringify([...docs.values()].filter(d=>d.origin==="Local import"||d.changed).map(d=>({name:d.name,source:d.source,sourcePath:d.sourcePath}))))}catch(e){}
+    try{localStorage.setItem("scapng-browser-drafts-v1",JSON.stringify([...docs.values()].filter(d=>d.origin==="Local import"||d.origin==="Locally created draft"||d.origin==="Local browser draft"||d.changed).map(d=>({name:d.name,source:d.source,sourcePath:d.sourcePath}))))}catch(e){}
   }
   const STIG_NAMES=Object.freeze({
     "rhel_9":"RHEL 9",
@@ -250,7 +250,7 @@
     ruleRows=[...merged.values()].sort((a,b)=>a.id.localeCompare(b.id));
   }
   const active=()=>ruleRows.find(r=>r.id===chosen);
-  const doc=()=>active()?.linked;
+  const doc=()=>standaloneId?docs.get("assessment:"+standaloneId):active()?.linked;
   const manualDoc=()=>active()?.manualId?docs.get("assessment:"+active().manualId):null;
   function display(txt,bad=false){message=txt;$("status").textContent=txt;$("status").className=bad?"warning":""}
   function flag(r){
@@ -265,12 +265,20 @@
       const list=section.querySelector(".stig-rules");
       if(key&&list)stigScrollPositions.set(key,list.scrollTop);
     }
+    const personal=[...docs.values()].filter(d=>d.kind==="assessment"&&
+      ["Locally created draft","Local browser draft","Local import"].includes(d.origin));
+    $("my-assessments").innerHTML=personal.length?personal.map(d=>
+      '<button type="button" class="personal-assessment '+(standaloneId===d.id?"active":"")+'" data-standalone="'+esc(d.id)+'">'+
+      esc(d.tree.assessment.assessment_title||d.id)+'</button>').join(""):'<p class="help">No personal Assessments yet.</p>';
+    $("my-assessments").querySelectorAll("[data-standalone]").forEach(b=>b.onclick=()=>{
+      standaloneId=b.dataset.standalone;creatingStandalone=false;chosen=null;selectedTest=null;view="guided";step=0;library();render();
+    });
     const choices=[["all","All"],["automated","Automated"],["not-automated","Without automated choice"],["needs-review","Assessment not loaded"],["candidates","Candidates"]];
     $("filters").innerHTML=choices.map(([v,name])=>'<button class="'+(filter===v?"selected":"")+'" data-filter="'+v+'">'+name+'</button>').join("");
     $("filters").querySelectorAll("[data-filter]").forEach(b=>b.onclick=()=>{
       filter=b.dataset.filter;
       if(filter==="all"){search="";$("query").value=""}
-      expandedStig=null;chosen=null;selectedTest=null;
+      expandedStig=null;chosen=null;standaloneId=null;creatingStandalone=false;selectedTest=null;
       library();render();
     });
     const matches=ruleRows.filter(r=>{
@@ -306,7 +314,7 @@
     }
     $("rules").querySelectorAll("[data-stig]").forEach(b=>b.onclick=()=>{
       expandedStig=expandedStig===b.dataset.stig?null:b.dataset.stig;
-      chosen=null;selectedTest=null;
+      chosen=null;standaloneId=null;creatingStandalone=false;selectedTest=null;
       library();render();
     });
     $("rules").querySelectorAll("[data-id]").forEach(b=>b.onclick=()=>open(b.dataset.id));
@@ -326,7 +334,7 @@
     $("content").querySelectorAll("[data-nav-rule]").forEach(b=>b.onclick=()=>{if(b.dataset.navRule)open(b.dataset.navRule)});
   }
   async function open(id){
-    chosen=id;expandedStig=ruleRows.find(r=>r.id===id)?.stig.key||null;
+    standaloneId=null;creatingStandalone=false;chosen=id;expandedStig=ruleRows.find(r=>r.id===id)?.stig.key||null;
     selectedTest=null;view="graphical";step=0;dirtySource=false;
     library();
     const requested=ruleRows.find(r=>r.id===id);
@@ -946,9 +954,10 @@
   }
   function render(){
     const r=active();tabs();
-    if(!r){$("crumb").textContent="LOCAL BROWSER WORKSPACE";$("title").textContent="SCAP-NG Assessment Studio";$("content").innerHTML='<section class="card"><h3>Select a STIG, then a Rule</h3><p>Expand a STIG on the left to view its Rules. No scanner is connected.</p></section>';return}
-    $("crumb").textContent=r.stig.name+" / "+r.id+" · "+(r.version||"source revision not specified");
-    $("title").textContent=r.title;
+    if(creatingStandalone){renderStandaloneCreation();return}
+    if(!r&&!standaloneId){$("crumb").textContent="LOCAL BROWSER WORKSPACE";$("title").textContent="SCAP-NG Assessment Studio";$("content").innerHTML='<section class="card"><h3>Select a STIG, then a Rule</h3><p>Expand a STIG on the left to view its Rules. No scanner is connected.</p></section>';return}
+    $("crumb").textContent=standaloneId?"MY ASSESSMENTS / "+standaloneId:r.stig.name+" / "+r.id+" · "+(r.version||"source revision not specified");
+    $("title").textContent=standaloneId?(doc()?.tree.assessment.assessment_title||standaloneId):r.title;
     $("state").textContent="No scanner connected";
     const d=doc();
     if(!d){
@@ -981,12 +990,14 @@
       if(!linked)$("suggest").onclick=()=>{const why=prompt("Reviewer rationale for possible automation (proposal only)");if(why){candidate.set(r.id,why);library();display("Candidate proposal saved in browser session")}};
       return;
     }
-    $("notice").textContent=(r.status==="needs-review"?r.reason+" · ":"")+"Imported source: "+d.origin+" · Draft-only. No authoritative schema verification or scanner evaluation.";
-    let html=view==="guided"?wizard():view==="graphical"?overview():view==="source"?sourceView():view==="split"?'<div class="split"><div>'+overview()+'</div>'+rawEditor()+'</div>':fixtures();
-    $("content").innerHTML=ruleNavigation(r)+html;
+    $("notice").textContent=(r?.status==="needs-review"?r.reason+" · ":"")+"Source: "+d.origin+" · Pre-alpha draft. No authoritative schema verification or scanner evaluation.";
+    let html=standaloneId?(view==="guided"?standaloneWizard():view==="graphical"?standaloneOverview():view==="source"?sourceView():view==="split"?'<div class="split"><div>'+standaloneOverview()+'</div>'+rawEditor()+'</div>':fixtures()):
+      view==="guided"?wizard():view==="graphical"?overview():view==="source"?sourceView():view==="split"?'<div class="split"><div>'+overview()+'</div>'+rawEditor()+'</div>':fixtures();
+    $("content").innerHTML=(standaloneId?"":ruleNavigation(r))+html;
     bindRuleNavigation();
     $("content").querySelectorAll("[data-select-test]").forEach(b=>b.onclick=()=>{selectedTest=b.dataset.selectTest;render();if(innerWidth<780)$("test-inspector")?.scrollIntoView({block:"start"})});
     $("content").querySelectorAll("[data-step]").forEach(b=>b.onclick=()=>{step=Number(b.dataset.step);render()});
+    bindStandaloneEditors();
     $("content").querySelectorAll("[data-field]").forEach(e=>e.onchange=()=>{
       const path=JSON.parse(decodeURIComponent(e.dataset.field));
       let d=doc(),v=e.value;
@@ -1001,6 +1012,14 @@
         if(!confirm("Change interpreter from "+orig+" to "+v+"? The command is not converted and may need changes.")){render();return}
       }
       if(typeof orig==="number"){const n=Number(v);if(!Number.isFinite(n)){display("Invalid number",true);return}v=n}
+      if(typeof orig==="boolean"){if(!["true","false"].includes(v)){display("Invalid Boolean",true);return}v=v==="true"}
+      if(standaloneId&&path.join(".")==="assessment.id"){
+        if(!/^[a-z0-9]+(?:[a-z0-9.-]*[a-z0-9])?$/.test(v)||docs.has("assessment:"+v)){display("Use a distinct, meaningful lowercase Assessment ID.",true);render();return}
+        docs.delete("assessment:"+standaloneId);
+        d.id=v;standaloneId=v;d.key="assessment:"+v;d.name=v+".assessment.yaml";
+        docs.set(d.key,d);
+      }
+      if(standaloneId&&path.includes("full_path")&&(!v.startsWith("/")||v.length<2)){display("Enter an absolute Linux file path.",true);render();return}
       putNode(d.tree,path,v);
       try{d.source=jsyaml.dump(d.tree,{lineWidth:105,noRefs:true});d.changed=true;saveState();display("Draft changed at "+path.slice(-3).join(" / ")+" — YAML reformatted; review before export");render()}catch(ex){putNode(d.tree,path,orig);display(ex.message,true)}
     });
@@ -1059,8 +1078,11 @@
     const exportSample=$("exportSample");if(exportSample)exportSample.onclick=()=>{try{const s=$("sampleText").value;JSON.parse(s);sampleText=s;download(r.id+"-synthetic-sample.json",s,"application/json");display("Synthetic sample downloaded — no scanner execution performed")}catch(e){display("Sample JSON invalid: "+e.message,true)}};
   }
   function download(name,data,type){const blob=new Blob([data],{type}),url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name.replace(/[^a-zA-Z0-9_.-]/g,"_");document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),500)}
-  $("query").oninput=e=>{search=e.target.value.toLowerCase();expandedStig=null;chosen=null;selectedTest=null;library();render()};
+  $("query").oninput=e=>{search=e.target.value.toLowerCase();expandedStig=null;chosen=null;standaloneId=null;creatingStandalone=false;selectedTest=null;library();render()};
   $("tabs").querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>setView(b.dataset.view));
+  $("new-assessment").onclick=()=>{
+    standaloneId=null;chosen=null;creatingStandalone=true;selectedTest=null;step=0;view="guided";library();render();
+  };
   $("import").onclick=()=>$("upload").click();
   $("upload").onchange=async e=>{
     let imported=0;
