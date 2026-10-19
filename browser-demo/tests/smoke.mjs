@@ -30,8 +30,13 @@ try {
     ['Read and match text in a file — independent.textfilecontent54'],
     'the first Guided preset must only enable a supported capability');
   assert.equal(await page.locator('#create-source-title').inputValue(),
-    'Read required login-banner text in /etc/issue',
+    'Read RHEL login banner in /etc/issue',
     'source description must be capability-specific and editable');
+  await page.locator('#create-file').fill('/etc/issue.net');
+  assert.equal(await page.locator('#create-source-title').inputValue(),
+    'Read RHEL login banner in /etc/issue.net',
+    'changing the target refreshes an untouched capability-derived source name');
+  await page.locator('#create-file').fill('/etc/issue');
   await page.locator('#create-line').fill('Authorized users only. (Example+)');
   await page.locator('#standalone-create button[type="submit"]').click();
   assert((await page.locator('#crumb').innerText()).includes('MY ASSESSMENTS'),'new Assessment must be independent');
@@ -46,7 +51,7 @@ try {
   const standaloneTest=standalone.assessment.tests['rhel-login-banner-required-line-test'];
   assert.equal(standaloneTest.capability,'independent.textfilecontent54');
   assert.equal(standaloneTest.object.select.full_path.equals,'/etc/issue');
-  assert.equal(standaloneTest.object.object_title,'Read required login-banner text in /etc/issue',
+  assert.equal(standaloneTest.object.object_title,'Read RHEL login banner in /etc/issue',
     'inline Object keeps its meaningful source title without inventing a shared Object ID');
   assert.equal(standaloneTest.states[0].text.equals,'Required banner text. (Revised+)');
   assert(standaloneTest.object.select.pattern.matches_regex.startsWith('^Required banner text'));
@@ -274,6 +279,7 @@ try {
   assert(!(await page.locator('#test-inspector .combined-check').innerText()).includes('Unresolved Object reference'),
     'objectless native collection should not be presented as broken data');
   await openRule('SV-257778');
+  await page.locator('.manual-assessment').waitFor({state:'visible',timeout:15000});
   assert(await page.locator('.manual-assessment').isVisible(),'manual-only Rule should show its authored procedure');
   assert((await page.locator('#manual-procedure').inputValue()).includes('dnf history'),
     'manual procedure should be directly readable and editable, not an empty automation panel');
