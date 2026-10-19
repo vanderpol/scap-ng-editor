@@ -1380,7 +1380,7 @@
             '<button class="button" data-generic-remove-state="'+esc(id)+'" data-index="'+index+'" '+(t.states.length<=1?"disabled":"")+' title="Remove this expected field">Remove</button></div>';
         }).join("")+
         (t.states.length>1?field(["assessment","tests",id,"states_match"],
-            "How conditions on this same file combine",t.states_match,["all","any","one","odd"]):"")+
+            "How conditions on this collected Item combine",t.states_match,["all","any","one","odd"]):"")+
         '<form class="generic-add-state" data-generic-add-state="'+esc(id)+'">'+
         '<label>Add another condition to this SAME collected '+(isRegistry?"registry entry":"Item")+'</label>'+
         '<div class="generic-cond-add"><select data-generic-field-for="'+esc(id)+'" aria-label="Expected field to add">'+
@@ -1457,16 +1457,25 @@
     const cap=$("generic-capability"),newField=$("generic-field");
     const showCapability=()=>{
       if(!cap)return;
-      const isText=cap.value==="independent.textfilecontent54";
+      const isText=cap.value==="independent.textfilecontent54",
+        isRegistry=cap.value==="windows.registry";
       $("generic-line-group").hidden=!isText;
       $("generic-field-group").hidden=isText;
+      $("generic-registry-group").hidden=!isRegistry;
       $("generic-line").required=isText;
+      $("generic-registry-name").required=isRegistry;
+      $("generic-path-label").textContent=isRegistry?"Windows Registry key":"Absolute Linux file or link to inspect";
+      $("generic-path").placeholder=isRegistry?"SOFTWARE\\ExampleVendor\\ExampleApp":"/var/log/secure";
+      newField.innerHTML=genericFieldOptions(undefined,cap.value);
       if(!isText)newFileValue();
     };
     function newFileValue(){
-      const field=newField?.value,type=genericSupportedField("unix.file",field);
+      const field=newField?.value,capability=cap?.value;
+      const type=genericSupportedField(capability,field);
       if(!field||!type)return;
-      $("generic-new-value-host").innerHTML=genericValue(type,type==="boolean"?false:type==="integer"?0:"");
+      const enumChoices=guidedValueEnums(capability,field);
+      const value=type==="boolean"?false:type==="integer"?0:enumChoices?.[0]||"";
+      $("generic-new-value-host").innerHTML=genericValue(type,value,capability,field);
     }
     if(cap){cap.onchange=showCapability;newField.onchange=newFileValue;showCapability()}
     const checkTitle=$("generic-check-title"),checkId=$("generic-check-id");
@@ -1481,7 +1490,8 @@
       genericChange(a=>genericNewTest(a,{
         title:checkTitle.value,id:checkId.value.trim(),capability,
         path:$("generic-path").value.trim(),line:$("generic-line").value,
-        field:newField.value,value:$("generic-new-value-host")?.querySelector("#generic-value")?.value
+        field:newField.value,value:$("generic-new-value-host")?.querySelector("#generic-value")?.value,
+        hive:$("generic-hive").value,registryName:$("generic-registry-name").value.trim()
       }),"Added independent check");
     };
     $("content").querySelectorAll("[data-generic-rename]").forEach(e=>e.onchange=()=>{
@@ -1491,12 +1501,31 @@
     $("content").querySelectorAll("[data-generic-path]").forEach(e=>e.onchange=()=>{
       const id=e.dataset.genericPath,path=e.value.trim();
       genericChange(a=>{
-        if(!path.startsWith("/")||path.length<2||/[\r\n]/.test(path))throw Error("Enter an absolute Linux path.");
-        const t=a.tests[id],old=t.object.select.full_path.equals;
-        t.object.select.full_path.equals=path;
+        const t=a.tests[id],isRegistry=t.capability==="windows.registry";
+        if(!path||/[\r\n]/.test(path)||(!isRegistry&&(!path.startsWith("/")||path.length<2)))
+          throw Error(isRegistry?"Enter a nonempty Windows Registry key.":"Enter an absolute Linux path.");
+        const ref=isRegistry?t.object.select.key:t.object.select.full_path,old=ref.equals;
+        ref.equals=path;
         if(t.object.object_title?.endsWith(old))
           t.object.object_title=t.object.object_title.slice(0,-old.length)+path;
-      },"Changed one Test collection path");
+      },"Changed one Test collection selector");
+    });
+    $("content").querySelectorAll("[data-generic-hive]").forEach(e=>e.onchange=()=>{
+      const id=e.dataset.genericHive,hive=e.value;
+      genericChange(a=>{
+        const t=a.tests[id],allowed=guidedMaps.get("windows.registry")?.native?.selector_value_enums?.hive;
+        if(t.capability!=="windows.registry"||!allowed?.includes(hive))throw Error("Unsupported Registry hive.");
+        t.object.select.hive.equals=hive;
+      },"Changed pinned Registry hive");
+    });
+    $("content").querySelectorAll("[data-generic-reg-name]").forEach(e=>e.onchange=()=>{
+      const id=e.dataset.genericRegName,name=e.value.trim();
+      genericChange(a=>{
+        if(!name||/[\r\n]/.test(name))throw Error("Enter a named Registry value.");
+        const t=a.tests[id];
+        if(t.capability!=="windows.registry")throw Error("Not a Registry Test.");
+        t.object.select.name.equals=name;
+      },"Changed Registry value name");
     });
     $("content").querySelectorAll("[data-generic-line]").forEach(e=>e.onchange=()=>{
       const id=e.dataset.genericLine,line=e.value;
@@ -1513,14 +1542,14 @@
       const id=e.dataset.genericState,index=Number(e.dataset.index),value=e.value;
       genericChange(a=>{
         const t=a.tests[id],state=t.states[index],field=Object.keys(state)[0];
-        state[field].equals=genericTypedValue(field,value);
+        state[field].equals=genericTypedValue(field,value,t.capability);
       },"Changed expected file property");
     });
     $("content").querySelectorAll("[data-generic-remove-state]").forEach(e=>e.onclick=()=>{
       const id=e.dataset.genericRemoveState,index=Number(e.dataset.index);
       if(!confirm("Remove this expected field from the Test?"))return;
       genericChange(a=>{
-        const t=a.tests[id];if(t.capability!=="unix.file"||t.states.length<2)throw Error("At least one State is required.");
+        const t=a.tests[id];if(t.capability==="independent.textfilecontent54"||t.states.length<2)throw Error("At least one State is required.");
         t.states.splice(index,1);if(t.states.length<2)delete t.states_match;
       },"Removed one State and preserved other fields");
     });
@@ -1528,8 +1557,9 @@
       const id=form.dataset.genericAddState,choice=form.querySelector("[data-generic-field-for]"),
         host=form.querySelector("[data-generic-value-host]");
       const refresh=()=>{
-        const type=genericSupportedField("unix.file",choice.value);
-        host.innerHTML=genericValue(type,type==="boolean"?false:type==="integer"?0:"");
+        const cap=doc()?.tree.assessment.tests[id]?.capability;
+        const type=genericSupportedField(cap,choice.value),enums=guidedValueEnums(cap,choice.value);
+        host.innerHTML=genericValue(type,type==="boolean"?false:type==="integer"?0:enums?.[0]||"",cap,choice.value);
       };
       choice.onchange=refresh;refresh();
       form.onsubmit=e=>{
@@ -1537,9 +1567,9 @@
         const field=choice.value,value=form.querySelector("#generic-value")?.value;
         genericChange(a=>{
           const t=a.tests[id];
-          if(t.capability!=="unix.file")throw Error("Only unix.file accepts these State fields.");
-          if(t.states.some(s=>Object.hasOwn(s,field)))throw Error("Field already has a condition on this file.");
-          t.states.push({[field]:{equals:genericTypedValue(field,value),require:"at_least_one_exists_and_all_match"}});
+          if(t.capability==="independent.textfilecontent54")throw Error("Text check uses an independently selected line.");
+          if(t.states.some(s=>Object.hasOwn(s,field)))throw Error("Field already has a condition on this collected Item.");
+          t.states.push({[field]:{equals:genericTypedValue(field,value,t.capability),require:"at_least_one_exists_and_all_match"}});
           if(t.states.length===2)t.states_match="all";
         },"Added same-file expected field");
       };
