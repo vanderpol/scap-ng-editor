@@ -1435,7 +1435,7 @@
       genericChange(a=>genericNewTest(a,{
         title:checkTitle.value,id:checkId.value.trim(),capability,
         path:$("generic-path").value.trim(),line:$("generic-line").value,
-        field:newField.value,value:$("generic-value")?.value
+        field:newField.value,value:$("generic-new-value-host")?.querySelector("#generic-value")?.value
       }),"Added independent check");
     };
     $("content").querySelectorAll("[data-generic-rename]").forEach(e=>e.onchange=()=>{
