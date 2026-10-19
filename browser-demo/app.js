@@ -22,6 +22,43 @@
   ];
   let docs=new Map(),ruleRows=[],chosen=null,selectedTest=null,view="graphical",step=0,filter="all",search="",message="",dirtySource=false;
   let sampleText="",candidate=new Map();
+  // Load interpreter choices from the exact upstream version-pinned capability mapping.
+  // No guessed fallback enum: when unavailable, users can still inspect raw YAML.
+  let shellChoices=null,shellChoicesVersion=null,shellChoicesError="Capability vocabulary not loaded.";
+  async function loadShellVocabulary(){
+    const config=window.SCAPNG_DEMO_SHELL_MAPPING;
+    if(!config?.repository||!config?.revision||!config?.path)return;
+    try{
+      const url="https://raw.githubusercontent.com/"+config.repository+"/"+config.revision+"/"+config.path;
+      const res=await fetch(url,{cache:"force-cache"});
+      if(!res.ok)throw Error("HTTP "+res.status);
+      const spec=await res.json();
+      const choices=spec.native?.collection_parameters?.shell?.enum;
+      if(spec.capability!=="independent.shellcommand"||spec.specification_version!==config.specificationVersion||
+         !Array.isArray(choices)||!choices.length||!choices.every(x=>typeof x==="string"&&x.length>0)||
+         new Set(choices).size!==choices.length)throw Error("Invalid or mismatched capability vocabulary.");
+      shellChoices=Object.freeze([...choices]);
+      shellChoicesVersion=spec.specification_version;
+      shellChoicesError="";
+    }catch(err){
+      shellChoices=null;shellChoicesVersion=null;
+      shellChoicesError="Pinned interpreter choices unavailable: "+err.message;
+    }
+  }
+  function shellInterpreterControl(path,shell,documentVersion){
+    const label='<label class="interpreter-label">Interpreter <small>(collect.shell)</small></label>';
+    if(shell===undefined||shell===null)return '<p class="warning">Interpreter is not defined in this source.</p>';
+    if(typeof shell==="object")
+      return '<div class="interpreter-row">'+label+'<span class="help">Defined by '+esc(shell.variable?"Variable: "+shell.variable:"a source expression")+' — see collection details</span></div>';
+    if(typeof shell!=="string")return '<div class="interpreter-row">'+label+'<span class="warning">Unsupported interpreter value; inspect source.</span></div>';
+    const allowed=shellChoices&&shellChoicesVersion===documentVersion&&shellChoices.includes(shell);
+    if(!allowed)return '<div class="interpreter-row">'+label+'<code>'+esc(shell)+'</code><span class="help">Read-only: '+esc(shellChoicesVersion!==documentVersion?"No matching pinned vocabulary for this document.":shellChoicesError||"Value not in pinned vocabulary.")+'</span></div>';
+    const enc=encodeURIComponent(JSON.stringify(path));
+    return '<div class="interpreter-row">'+label+'<select class="interpreter-select" data-field="'+enc+'" aria-label="Interpreter">'+
+      shellChoices.map(x=>'<option value="'+esc(x)+'" '+(x===shell?"selected":"")+'>'+esc(x)+'</option>').join("")+
+      '</select></div>';
+  }
+
   const levels=["at_least_one_exists_and_all_match","at_least_one_exists_and_some_match","at_least_one_exists_and_only_one_matches","only_one_exists_and_matches","none_exist","none_match","may_be_absent_and_all_match"];
   const getNode=(obj,path)=>path.reduce((o,k)=>o==null?undefined:o[k],obj);
   const putNode=(obj,path,value)=>{let o=obj;for(let i=0;i<path.length-1;i++)o=o[path[i]];o[path[path.length-1]]=value};
@@ -177,6 +214,8 @@
       const groupSummary=special||clause||groupLabel;
       const children=Object.entries(o).map(([key,v])=>{
         if(v&&typeof v==="object")return walk(v,path.concat(key),key,depth+1);
+        if(key==="shell"&&path[path.length-1]==="collect")
+          return shellInterpreterControl(path.concat(key),v,doc()?.tree.assessment?.specification?.version);
         return field(path.concat(key),prettyName(key),v,key==="require"||key==="collected_items_require"||key==="state_fields_require"?levels:key==="states_match"?["all","any","none","one"]:null);
       }).join("");
       return '<details class="structure-node" '+(depth<2?"open":"")+'><summary>'+esc(groupSummary)+' <small>('+keys.length+' properties)</small></summary><div class="structure-children">'+children+'</div></details>';
@@ -424,8 +463,10 @@
     const o=objectRef?a.shared_objects?.[objectRef]:t.object;
     if(t.capability!=="independent.shellcommand"&&o?.capability!=="independent.shellcommand")return "";
     const command=o?.collect?.command,shell=o?.collect?.shell;
+    const shellPath=objectRef?["assessment","shared_objects",objectRef,"collect","shell"]:
+      ["assessment","tests",id,"object","collect","shell"];
     const header='<div class="shellcommand-panel"><div class="shellcommand-heading">Command used to collect the data <small>(shellcommand)</small></div>'+
-      (shell?'<p class="help">Interpreter: <code>'+esc(shell)+'</code></p>':"");
+      shellInterpreterControl(shellPath,shell,a.specification?.version);
     if(typeof command==="string"){
       const base=objectRef?["assessment","shared_objects",objectRef,"collect","command"]:["assessment","tests",id,"object","collect","command"];
       const path=encodeURIComponent(JSON.stringify(base));
@@ -538,6 +579,15 @@
       const path=JSON.parse(decodeURIComponent(e.dataset.field));
       let d=doc(),v=e.value;
       const orig=getNode(d.tree,path);
+      const isShell=path.length>=3&&path[path.length-2]==="collect"&&path[path.length-1]==="shell";
+      if(isShell){
+        if(typeof orig!=="string"||!shellChoices||shellChoicesVersion!==d.tree.assessment?.specification?.version||
+           !shellChoices.includes(orig)||!shellChoices.includes(v)){
+          display("Interpreter not changed: choose a supported value from the pinned capability list.",true);render();return;
+        }
+        if(v===orig)return;
+        if(!confirm("Change interpreter from "+orig+" to "+v+"? The command is not converted and may need changes.")){render();return}
+      }
       if(typeof orig==="number"){const n=Number(v);if(!Number.isFinite(n)){display("Invalid number",true);return}v=n}
       putNode(d.tree,path,v);
       try{d.source=jsyaml.dump(d.tree,{lineWidth:105,noRefs:true});d.changed=true;saveState();display("Draft changed at "+path.slice(-3).join(" / ")+" — YAML reformatted; review before export");render()}catch(ex){putNode(d.tree,path,orig);display(ex.message,true)}
@@ -586,12 +636,14 @@
   async function init(){
     if(!window.jsyaml){display("YAML parser asset did not load — app cannot parse files.",true);return}
     display("Loading six pinned source-backed Rule/Assessment examples from public GitHub…");
+    const capabilityLoad=loadShellVocabulary();
     const got=await Promise.all(seeded.map(async ([path])=>{
       try{const url=src+path;const res=await fetch(url,{cache:"force-cache"});if(!res.ok)throw Error("HTTP "+res.status);return {name:path.split("/").pop(),text:await res.text(),url}}
       catch(e){return {err:path+": "+e.message}}
     }));
     let failures=[];
     for(const item of got){if(item.err){failures.push(item.err);continue}try{addDoc(item.name,item.text,"Pinned source "+snap.slice(0,10))}catch(e){failures.push(item.name+": "+e.message)}}
+    await capabilityLoad;
     readState();indexRules();if(ruleRows.length)chosen=ruleRows[0].id;library();render();
     display(failures.length?"Only "+(got.length-failures.length)+" examples loaded; import local YAML to continue. "+failures[0]:"Loaded "+ruleRows.length+" pinned Rules and linked Assessments. Choose one to review.",!!failures.length);
   }
