@@ -223,10 +223,11 @@
   function indexRules(){
     ruleRows=[...docs.values()].filter(d=>d.kind==="rule").map(d=>{
       let r=d.tree.rule,aid=r.assessment_choices?.automated?.assessment;
+      const manualId=r.assessment_choices?.manual?.assessment;
       let linked=aid?docs.get("assessment:"+aid):undefined;
       const closure=aid?assessmentReferenceClosure(aid):null;
       let status=closure?(closure.ready?"automated":"needs-review"):"not-automated";
-      return {id:String(r.id),title:String(r.title||r.id),severity:String(r.severity||"unknown"),version:r.version||"",aliases:(r.identifiers||[]).map(x=>x.value).filter(Boolean),aid,linked,status,reason:closure?.reason||"",stig:stigForRule(d)};
+      return {id:String(r.id),title:String(r.title||r.id),severity:String(r.severity||"unknown"),version:r.version||"",aliases:(r.identifiers||[]).map(x=>x.value).filter(Boolean),aid,linked,status,reason:closure?.reason||"",manualId,stig:stigForRule(d)};
     });
     const merged=new Map(catalogRuleRows.map(r=>[r.id,r]));
     for(const r of ruleRows)merged.set(r.id,r);
