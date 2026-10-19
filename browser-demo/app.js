@@ -294,23 +294,73 @@
     if(o.for_each)return {text:source+" collected for each "+String(o.for_each.item||"item")+" from "+String(o.for_each.in||"the referenced source"),detail:ref?"Shared source: "+ref:"Local source"};
     return {text:source+(o.object_title?" ("+o.object_title+")":""),detail:ref?"Shared source: "+ref:"Local source"};
   }
+  function simpleMatchShape(t){
+    if(!Array.isArray(t.states)||t.states.length!==1)return null;
+    const state=t.states[0];
+    if(!state||typeof state!=="object"||Array.isArray(state))return null;
+    const parts=Object.entries(state);
+    if(parts.length!==1)return null;
+    const [name,matcher]=parts[0];
+    if(!matcher||typeof matcher!=="object"||Array.isArray(matcher)||matcher.record||matcher.and||matcher.or)return null;
+    const comparisons=["equals","case_insensitive_equals","matches_regex","greater_than_or_equal","less_than_or_equal","greater_than","less_than"];
+    const present=comparisons.filter(k=>Object.hasOwn(matcher,k));
+    if(present.length!==1||matcher[present[0]]===null||typeof matcher[present[0]]==="object")return null;
+    return {name,matcher,op:present[0],value:matcher[present[0]]};
+  }
+  function shortRequireChoice(k){
+    const names={
+      at_least_one_exists_and_all_match:"One or more found; all match",
+      at_least_one_exists_and_some_match:"One or more found; at least one matches",
+      at_least_one_exists_and_only_one_matches:"One or more found; exactly one matches",
+      only_one_exists_and_matches:"Exactly one found and it matches",
+      none_exist:"No results allowed",
+      none_match:"No results may match",
+      may_be_absent_and_all_match:"May be absent; all found must match"
+    };
+    return names[k]||"Unrecognized: "+String(k);
+  }
+  function requirementSelect(path,value,description){
+    if(value===undefined||value===null)return '<p class="warning">No authored '+esc(description)+' option. Use detailed source editing; none is assumed.</p>';
+    const enc=encodeURIComponent(JSON.stringify(path));
+    const options=[...new Set([value,...levels])].map(k=>'<option value="'+esc(k)+'" '+(k===value?"selected":"")+'>'+esc(shortRequireChoice(k))+'</option>').join("");
+    return '<select class="quick-require-select" data-field="'+enc+'" aria-label="'+esc(description)+'">'+options+'</select>';
+  }
   function oneFieldEditor(id,t){
-    const states=t.states;
-    if(!Array.isArray(states)||states.length!==1)return "";
-    const one=states[0];
-    if(!one||Array.isArray(one)||typeof one!=="object")return "";
-    const fields=Object.entries(one);
-    if(fields.length!==1)return "";
-    const [name,matcher]=fields[0];
-    if(!matcher||typeof matcher!=="object"||Array.isArray(matcher)||matcher.record||matcher.and||matcher.or)return "";
-    const comparison=["equals","case_insensitive_equals","matches_regex","greater_than_or_equal","less_than_or_equal","greater_than","less_than"]
-      .filter(x=>Object.hasOwn(matcher,x));
-    if(comparison.length!==1||matcher[comparison[0]]===null||typeof matcher[comparison[0]]==="object")return "";
-    const op=comparison[0];
-    const exactPath=["assessment","tests",id,"states",0,name,op];
-    return '<div class="inline-predicate"><div class="help">Edit this matching value without leaving the check</div>'+
-      field(exactPath,name+" "+prettyName(op)+" (States)",matcher[op])+
-      (matcher.require?'<p class="help">Matching requirement for this field (require): '+esc(requirementDescription(matcher.require))+'</p>':"")+
+    const shape=simpleMatchShape(t);
+    if(!shape)return "";
+    const {name,matcher,op,value}=shape;
+    const base=["assessment","tests",id,"states",0,name];
+    const isNumeric=typeof value==="number";
+    const isBool=typeof value==="boolean";
+    const allowed=isBool?["equals"]:isNumeric?["equals","greater_than","greater_than_or_equal","less_than","less_than_or_equal"]:
+      ["equals","case_insensitive_equals","matches_regex"];
+    // Other/unknown source operators remain readable; never remove an unsupported operator.
+    if(!allowed.includes(op))allowed.unshift(op);
+    const comparisonLabels={
+      equals:"Equals",
+      case_insensitive_equals:"Equals (ignoring case)",
+      matches_regex:"Matches regular expression",
+      greater_than:"Is greater than",
+      greater_than_or_equal:"Is at least",
+      less_than:"Is less than",
+      less_than_or_equal:"Is at most"
+    };
+    const opChoices=allowed.map(k=>'<option value="'+esc(k)+'" '+(k===op?"selected":"")+'>'+esc(comparisonLabels[k]||k)+'</option>').join("");
+    const fieldPath=encodeURIComponent(JSON.stringify(base.concat(op)));
+    const opPath=encodeURIComponent(JSON.stringify(base));
+    const input=isBool?'<span class="help">Boolean comparison; use Source to change the value.</span>':
+      '<input type="text" class="predicate-value" data-field="'+fieldPath+'" value="'+esc(String(value))+'" aria-label="Expected value for '+esc(name)+'" spellcheck="false">';
+    return '<div class="inline-predicate" aria-label="Edit expected condition">'+
+      '<div class="predicate-heading">Required condition <small>(State)</small></div>'+
+      '<div class="predicate-grid">'+
+      '<div class="predicate-part"><label>From each result, check field</label><code class="field-name">'+esc(name)+'</code></div>'+
+      '<div class="predicate-part"><label for="predicate-operation">Comparison</label><select id="predicate-operation" data-operation="'+opPath+'" aria-label="Comparison for '+esc(name)+'">'+opChoices+'</select></div>'+
+      '<div class="predicate-part"><label for="predicate-value">Expected value</label>'+input+'</div>'+
+      '</div>'+
+      (matcher.require?'<div class="predicate-quantity"><label>How many values of <code>'+esc(name)+'</code> within each result must match? (require)</label>'+
+        requirementSelect(base.concat("require"),matcher.require,"Field-value matching requirement")+'</div>':
+        '<p class="help">No field-specific count requirement was authored; the editor does not assume one.</p>')+
+      '<p class="help">Changing a comparison changes its meaning. The draft preserves other known fields, but it is not schema- or scanner-verified.</p>'+
       '</div>';
   }
   // Applies at the Test's collected-Item population, not to State fields.
@@ -379,22 +429,24 @@
     return header+'<p class="warning">No directly displayable command string is present. Inspect the complete collection source below.</p></div>';
   }
   function combinedReading(a,id,t){
-    const from=humanCollection(a,t),expectation=summarizeTest(t);
+    const from=humanCollection(a,t),shape=simpleMatchShape(t),counts=resultCountExplanation(t.collected_items_require);
     const mode=t.states_match==="any"?"At least one alternative must match":t.states_match==="all"?"All alternatives must match":t.states_match==="none"?"No alternative may match":t.states_match==="one"?"Exactly one alternative must match":"State combination shown in details";
-    const counts=resultCountExplanation(t.collected_items_require);
     return '<section class="combined-check" aria-label="Readable test description">'+
       '<h4>What this check means</h4>'+
       '<p class="check-sentence"><strong>Look at</strong> '+esc(from.text)+'. <small>'+esc(from.detail)+'</small></p>'+
       shellCommandDetails(a,id,t)+
-      '<p class="check-sentence"><strong>Require</strong> '+esc(expectation)+'.</p>'+
-      '<div class="check-scope"><strong>How many results are required?</strong>'+
-      '<div class="result-requirement"><span>Must be found:</span> '+esc(counts.found)+'</div>'+
-      '<div class="result-requirement"><span>Must match:</span> '+esc(counts.match)+'</div>'+
-      (t.states_match?'<div class="result-requirement"><span>If there are alternative conditions:</span> '+esc(mode)+'.</div>':"")+
-      (t.state_fields_require?'<div class="result-requirement"><span>Conditions on individual fields:</span> '+esc(requirementDescription(t.state_fields_require))+'.</div>':"")+
-      '<small>These counts apply to results from “Look at,” not to fields within a single result. Exact settings are under advanced details.</small>'+
-      '</div>'+oneFieldEditor(id,t)+
-      '<p class="help">This is a readable projection, not a second source format. Expanded details preserve all authored requirements and collection references.</p>'+
+      (shape?oneFieldEditor(id,t):
+        '<div class="condition-readonly"><strong>Required conditions (States)</strong><p>'+esc(summarizeTest(t))+'</p><p class="help">This check has multiple or nested conditions. Expand the detailed view to edit each one.</p></div>')+
+      '<div class="quick-results"><label>Which collected results must exist and match?</label>'+
+      requirementSelect(["assessment","tests",id,"collected_items_require"],t.collected_items_require,"Results that must be found and match")+
+      '<details class="result-explanation"><summary>Explain this requirement</summary>'+
+      '<p><strong>Must be found:</strong> '+esc(counts.found)+'</p>'+
+      '<p><strong>Must match:</strong> '+esc(counts.match)+'</p>'+
+      '<p class="help">These are results returned by “Look at,” not values of an individual State field.</p></details>'+
+      '</div>'+
+      (t.states_match?'<p class="help">Alternative conditions: '+esc(mode)+'. <span>(states_match)</span></p>':"")+
+      (t.state_fields_require?'<p class="help">Across State fields: '+esc(requirementDescription(t.state_fields_require))+' (state_fields_require)</p>':"")+
+      '<p class="help">Only authored settings are edited. Draft edits currently reformat YAML and are not scanner-verified.</p>'+
       '</section>';
   }
   function inspector(a,id,refs){
