@@ -69,6 +69,21 @@
   const levels=["at_least_one_exists_and_all_match","at_least_one_exists_and_some_match","at_least_one_exists_and_only_one_matches","only_one_exists_and_matches","none_exist","none_match","may_be_absent_and_all_match"];
   const getNode=(obj,path)=>path.reduce((o,k)=>o==null?undefined:o[k],obj);
   const putNode=(obj,path,value)=>{let o=obj;for(let i=0;i<path.length-1;i++)o=o[path[i]];o[path[path.length-1]]=value};
+  // Key renames (including record member names) must preserve sibling entries and
+  // their values. Unlike putNode, this replaces the mapping key, not its value.
+  function renameMappingKey(tree,path,nextName){
+    const parentPath=path.slice(0,-1),oldName=path[path.length-1];
+    const mapping=getNode(tree,parentPath);
+    if(!mapping||typeof mapping!=="object"||Array.isArray(mapping)||!Object.hasOwn(mapping,oldName))
+      throw Error("Field name is no longer present in the source.");
+    const proposed=String(nextName).trim();
+    if(!proposed)throw Error("Field name cannot be empty.");
+    if(Object.hasOwn(mapping,proposed)&&proposed!==oldName)
+      throw Error("A field named "+proposed+" already exists at this level.");
+    if(proposed===oldName)return false;
+    putNode(tree,parentPath,Object.fromEntries(Object.entries(mapping).map(([name,value])=>[name===oldName?proposed:name,value])));
+    return true;
+  }
   function parse(srcText){
     if(srcText.length>1800000)throw Error("Document exceeds 1.8 MB browser-demo limit");
     const o=jsyaml.load(srcText);
@@ -736,7 +751,7 @@
       const opAttr=encodeURIComponent(JSON.stringify(base));
       const valAttr=encodeURIComponent(JSON.stringify(base.concat(op)));
       return '<div class="record-edit-row">'+
-        '<div><label>Field</label><code>'+esc(name)+'</code></div>'+
+        '<div><label>Field</label><input type="text" data-rename-key="'+encodeURIComponent(JSON.stringify(base))+'" value="'+esc(name)+'" aria-label="Record field name '+esc(name)+'" spellcheck="false"></div>'+
         '<div><label>Must</label><select data-operation="'+opAttr+'" aria-label="Comparison for '+esc(name)+'">'+opOptions+'</select></div>'+
         '<div><label>Value</label><input type="text" data-field="'+valAttr+'" value="'+esc(String(value))+'" aria-label="Expected value for '+esc(name)+'"></div>'+
         (m.require?'<div class="record-require"><label>Values required</label>'+requirementSelect(base.concat("require"),m.require,"Field requirement")+'</div>':"")+
@@ -977,6 +992,31 @@
       if(typeof orig==="number"){const n=Number(v);if(!Number.isFinite(n)){display("Invalid number",true);return}v=n}
       putNode(d.tree,path,v);
       try{d.source=jsyaml.dump(d.tree,{lineWidth:105,noRefs:true});d.changed=true;saveState();display("Draft changed at "+path.slice(-3).join(" / ")+" — YAML reformatted; review before export");render()}catch(ex){putNode(d.tree,path,orig);display(ex.message,true)}
+    });
+    $("content").querySelectorAll("[data-rename-key]").forEach(e=>e.onchange=()=>{
+      const path=JSON.parse(decodeURIComponent(e.dataset.renameKey)),d=doc();
+      const parent=path.slice(0,-1),previous=getNode(d.tree,parent);
+      const from=String(path[path.length-1]),to=e.value.trim();
+      if(to===from){render();return}
+      if(!to||Object.hasOwn(previous||{},to)){
+        display(!to?"Field name cannot be empty.":"Record already contains a field named "+to+".",true);
+        render();return;
+      }
+      if(!confirm("Rename record field "+from+" to "+to+"? This changes which collected field is checked; the editor cannot verify the assessment result.")){
+        render();return;
+      }
+      try{
+        renameMappingKey(d.tree,path,to);
+        const next=jsyaml.dump(d.tree,{lineWidth:105,noRefs:true});
+        parse(next);
+        d.source=next;d.changed=true;saveState();
+        display("Renamed record field "+from+" → "+to+" in draft — review YAML before export; formatting may change.");
+        render();
+      }catch(err){
+        putNode(d.tree,parent,previous);
+        display("Record field not renamed: "+err.message,true);
+        render();
+      }
     });
     $("content").querySelectorAll("[data-operation]").forEach(e=>e.onchange=()=>{
       const base=JSON.parse(decodeURIComponent(e.dataset.operation)),d=doc();
