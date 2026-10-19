@@ -10,6 +10,11 @@
 
 > **The shared contract for ChatGPT, Codex, and human contributors.** Read this file and root `AGENTS.md` before beginning development. Commit updates to this file alongside meaningful implementation milestones. The **repository** is the communication medium; chat prompts are not the durable project specification. This file is not an autonomous job queue or a signal that a task is running.
 
+## Editable field completeness — 19 October 2026
+
+- **Owner-wide acceptance requirement [#12](https://github.com/vanderpol/scap-ng-editor/issues/12):** Every field/key editable in authored SCAP-NG content must have a corresponding graphical editing control, with version-pinned dropdowns for finite vocabularies and text/other typed inputs for unconstrained values. This is **not yet implemented comprehensively**; audit nested mapping keys, all six sample cases and structural changes. Do not treat raw Source as a substitute or conflate form editing with tested scanner validation.
+- **Focused Windows TPM defect addressed on `main`:** The "Check these fields (record)" row no longer renders `tpmpresent` as read-only code: rename the member via editable Field input with duplicate/blank rejection and confirmation. Mapping key and nested predicate are kept together; sibling fields and order remain unchanged in the parsed document. Added Playwright smoke regression for value editing, conflicting key rejection, rename, and graphical/source round-trip. **Full CI/browser smoke and deployed Pages build must be checked independently.** Browser demo still rewrites YAML formatting/comments on graphical edits; structural/semantic validation and production-grade source-preserving engine remain open.
+
 ## Hierarchy-first / complexity iteration — 18 October 2026
 
 - **Count-label wording correction (18 Oct):** Replaced persistent vague “Across collected results” and “Within each result” with directly editable question-form labels: **How many results must be found and match?** (`collected_items_require`) and **How many field values in each result must match?** (`require`). Dropdown values and distinct YAML paths are unchanged. Correctness checked by JS syntax and UI source mapping; online deployment/full Chrome smoke unverified. [#10](https://github.com/vanderpol/scap-ng-editor/issues/10).
