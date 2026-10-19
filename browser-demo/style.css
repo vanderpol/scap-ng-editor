@@ -108,3 +108,13 @@
 .stig-rules .rule.active{border-left:3px solid #1b69ad;padding-left:8px}
 .stig-rules .rule-name{display:block;font-size:11px;line-height:1.4;margin:3px 0 6px}
 .stig-rules .tag{font-size:9px;line-height:1.3;margin-bottom:2px}
+
+/* Reference-aware read-only Assessment expansion, with source provenance. */
+.assessment-reference{border-left:3px solid #95bdde}
+.linked-test{padding:10px 12px;cursor:default}
+.linked-test>summary{cursor:pointer;font-weight:650;font-size:12px}
+.linked-test>summary small{display:block;font-weight:400;color:#6b8094}
+.linked-test p{color:#3b5268;font-size:12px;margin:6px 0}
+.linked-test-source{margin:8px 0;font-size:12px;color:#446987}
+.linked-test-source>summary{cursor:pointer}
+.linked-test-source pre{background:#f3f7fc;white-space:pre-wrap;overflow-wrap:anywhere;padding:9px;border:1px solid #e2eaf4;border-radius:5px;max-height:300px;overflow:auto;font-size:11px}
