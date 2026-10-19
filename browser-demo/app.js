@@ -21,7 +21,8 @@
     ["ms_windows_server_dns/assessments/automated/SV-259345.automated.yaml","assessment"]
   ];
   let docs=new Map(),ruleRows=[],chosen=null,selectedTest=null,view="graphical",step=0,filter="all",search="",message="",dirtySource=false;
-  const expandedStigs=new Set(),searchCollapsedStigs=new Set();
+  // Only one STIG can reveal its Rules. Others have no Rule DOM nodes.
+  let expandedStig=null;
   let sampleText="",candidate=new Map();
   // Load interpreter choices from the exact upstream version-pinned capability mapping.
   // No guessed fallback enum: when unavailable, users can still inspect raw YAML.
@@ -144,16 +145,17 @@
   }
   function library(){
     const choices=[["all","All"],["automated","Automated"],["not-automated","Without automated choice"],["needs-review","Assessment not loaded"],["candidates","Candidates"]];
-    $("filters").innerHTML=choices.map(([val,name])=>'<button class="'+(filter===val?"selected":"")+'" data-filter="'+val+'">'+name+'</button>').join("");
+    $("filters").innerHTML=choices.map(([v,name])=>'<button class="'+(filter===v?"selected":"")+'" data-filter="'+v+'">'+name+'</button>').join("");
     $("filters").querySelectorAll("[data-filter]").forEach(b=>b.onclick=()=>{
-      filter=b.dataset.filter;expandedStigs.clear();searchCollapsedStigs.clear();
-      if(filter==="all"){search="";$("query").value=""}library();
+      filter=b.dataset.filter;
+      if(filter==="all"){search="";$("query").value=""}
+      expandedStig=null;chosen=null;selectedTest=null;
+      library();render();
     });
     const matches=ruleRows.filter(r=>{
       if(search&&!(r.id+" "+r.title+" "+r.version+" "+r.aliases.join(" ")+" "+r.stig.name).toLowerCase().includes(search))return false;
       if(filter==="candidates")return candidate.has(r.id);
-      if(filter==="all")return true;
-      return r.status===filter;
+      return filter==="all"||r.status===filter;
     });
     const grouped=new Map();
     for(const r of matches){
@@ -161,25 +163,29 @@
       grouped.get(r.stig.key).rules.push(r);
     }
     const groups=[...grouped.values()].sort((a,b)=>a.stig.name.localeCompare(b.stig.name));
-    $("counter").textContent=groups.length+" STIGs · "+matches.length+" of "+ruleRows.length+" loaded Rules · partial source catalog";
+    $("counter").textContent=groups.length+" STIGs · "+matches.length+" of "+ruleRows.length+" loaded Rules · partial catalog";
     $("rules").innerHTML=groups.length?groups.map(({stig,rules})=>{
-      const expanded=search?!searchCollapsedStigs.has(stig.key):expandedStigs.has(stig.key),automated=rules.filter(r=>r.status==="automated").length;
+      const expanded=expandedStig===stig.key;
+      const automated=rules.filter(r=>r.status==="automated").length;
       return '<section class="stig-group">'+
         '<button class="stig-toggle" data-stig="'+esc(stig.key)+'" aria-expanded="'+expanded+'">'+
         '<span class="stig-arrow">'+(expanded?"▾":"▸")+'</span><span class="stig-title">'+esc(stig.name)+'</span>'+
-        '<small>'+rules.length+' Rules · '+automated+' automated linked</small></button>'+
-        '<div class="stig-rules" '+(expanded?"":'hidden')+'>'+
-        rules.map(r=>'<button class="rule '+(chosen===r.id?"active":"")+'" data-id="'+esc(r.id)+'"><span class="rid">'+esc(r.id)+'</span><span class="rule-name">'+esc(r.title)+'</span>'+
-          flag(r)+(r.linked&&r.aid.startsWith("ng.shared.")?'<span class="tag">Shared Assessment resolved</span>':"")+
-          '</button>').join("")+'</div></section>';
-    }).join(""):'<div class="empty">No matching loaded Rules.<p>Import Rule and Assessment YAML to broaden your library.</p></div>';
+        '<small>'+rules.length+' Rules · '+automated+' automated</small></button>'+
+        (expanded?'<div class="stig-rules" role="group" aria-label="'+esc(stig.name)+' Rules">'+
+          rules.map(r=>'<button class="rule '+(chosen===r.id?"active":"")+'" data-id="'+esc(r.id)+'">'+
+            '<span class="rid">'+esc(r.id)+'</span><span class="rule-name">'+esc(r.title)+'</span>'+
+            flag(r)+(r.linked&&r.aid.startsWith("ng.shared.")?'<span class="tag">Shared Assessment resolved</span>':"")+
+            '</button>').join("")+'</div>':"")+
+        '</section>';
+    }).join(""):'<div class="empty">No matching loaded Rules.<p>Import a Rule and its Assessment to expand this library.</p></div>';
     $("rules").querySelectorAll("[data-stig]").forEach(b=>b.onclick=()=>{
-      const id=b.dataset.stig,which=search?searchCollapsedStigs:expandedStigs;
-      if(which.has(id))which.delete(id);else which.add(id);library();
+      expandedStig=expandedStig===b.dataset.stig?null:b.dataset.stig;
+      chosen=null;selectedTest=null;
+      library();render();
     });
-    $("rules").querySelectorAll("[data-id]").forEach(e=>e.onclick=()=>open(e.dataset.id));
+    $("rules").querySelectorAll("[data-id]").forEach(b=>b.onclick=()=>open(b.dataset.id));
   }
-  function open(id){chosen=id;selectedTest=null;view="graphical";step=0;dirtySource=false;library();render()}
+  function open(id){chosen=id;expandedStig=ruleRows.find(r=>r.id===id)?.stig.key||null;selectedTest=null;view="graphical";step=0;dirtySource=false;library();render()}
   function tabs(){
     $("tabs").querySelectorAll("[data-view]").forEach(e=>{e.classList.toggle("selected",e.dataset.view===view);e.disabled=!doc()});
     $("export").disabled=!doc();$("original").disabled=!doc();
@@ -649,7 +655,7 @@
   function sourceView(){return rawEditor()}
   function render(){
     const r=active();tabs();
-    if(!r){$("crumb").textContent="LOCAL BROWSER WORKSPACE";$("title").textContent="SCAP-NG Assessment Studio";$("content").innerHTML='<section class="card"><h3>Open a Rule to begin</h3><p>Import Rule and Assessment YAML, or use the two pinned external examples once loaded. This browser demo does not call AI or execute the scanner.</p></section>';return}
+    if(!r){$("crumb").textContent="LOCAL BROWSER WORKSPACE";$("title").textContent="SCAP-NG Assessment Studio";$("content").innerHTML='<section class="card"><h3>Select a STIG, then a Rule</h3><p>Expand a STIG on the left to view its Rules. No scanner is connected.</p></section>';return}
     $("crumb").textContent=r.id+' · '+(r.version||"source revision not specified");
     $("title").textContent=r.title;
     $("state").textContent="No scanner connected";
@@ -715,7 +721,7 @@
     const exportSample=$("exportSample");if(exportSample)exportSample.onclick=()=>{try{const s=$("sampleText").value;JSON.parse(s);sampleText=s;download(r.id+"-synthetic-sample.json",s,"application/json");display("Synthetic sample downloaded — no scanner execution performed")}catch(e){display("Sample JSON invalid: "+e.message,true)}};
   }
   function download(name,data,type){const blob=new Blob([data],{type}),url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name.replace(/[^a-zA-Z0-9_.-]/g,"_");document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),500)}
-  $("query").oninput=e=>{search=e.target.value.toLowerCase();searchCollapsedStigs.clear();library()};
+  $("query").oninput=e=>{search=e.target.value.toLowerCase();expandedStig=null;chosen=null;selectedTest=null;library();render()};
   $("tabs").querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>setView(b.dataset.view));
   $("import").onclick=()=>$("upload").click();
   $("upload").onchange=async e=>{
@@ -737,7 +743,7 @@
     let failures=[];
     for(const item of got){if(item.err){failures.push(item.err);continue}try{addDoc(item.name,item.text,"Pinned source "+snap.slice(0,10),false,item.path)}catch(e){failures.push(item.name+": "+e.message)}}
     await capabilityLoad;
-    readState();indexRules();if(ruleRows.length)chosen=ruleRows[0].id;library();render();
+    readState();indexRules();chosen=null;expandedStig=null;library();render();
     display(failures.length?"Only "+(got.length-failures.length)+" examples loaded; import local YAML to continue. "+failures[0]:"Loaded "+ruleRows.length+" pinned Rules and linked Assessments. Choose one to review.",!!failures.length);
   }
   init();
