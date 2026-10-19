@@ -12,3 +12,10 @@ window.SCAPNG_DEMO_SHELL_MAPPING = Object.freeze({
   path: "schema/v0.4.0/capability-mappings/supported/independent.shellcommand.json",
   specificationVersion: "0.4.0"
 });
+
+/* Complete Rule indexes: pinned preview authoring release, fetched lazily by the browser. */
+window.SCAPNG_COMPLETE_CATALOG = Object.freeze({
+  repository: "vanderpol/scap-ng-editor-sample-data",
+  revision: "1378a794a6f793093849e06959b5b2044bcff2c0",
+  manifestPath: "complete-stigs/manifest.json"
+});
