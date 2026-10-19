@@ -102,12 +102,35 @@
     if(!part||part==="rules")return {key:"imported",name:"Imported Rules (STIG not identified)"};
     return {key:part,name:STIG_NAMES[part]||part.replaceAll("_"," ")};
   }
+  function assessmentReferenceClosure(id,stack=[]){
+    if(stack.includes(id))return {ready:false,reason:"Cyclic Assessment dependency: "+[...stack,id].join(" → ")};
+    const target=docs.get("assessment:"+id);
+    if(!target)return {ready:false,reason:"Referenced automated Assessment not loaded: "+id};
+    const a=target.tree.assessment;
+    const refs=new Set();
+    const gather=(value,depth=0)=>{
+      if(depth>64||!value||typeof value!=="object")return;
+      if(Array.isArray(value)){value.forEach(v=>gather(v,depth+1));return}
+      if(typeof value.assessment==="string")refs.add(value.assessment);
+      for(const [key,v] of Object.entries(value)){
+        if(key!=="assessment"&&v&&typeof v==="object")gather(v,depth+1);
+      }
+    };
+    gather(a.evaluate);
+    gather(a.applicability);
+    for(const ref of refs){
+      const outcome=assessmentReferenceClosure(ref,stack.concat(id));
+      if(!outcome.ready)return outcome;
+    }
+    return {ready:true,reason:""};
+  }
   function indexRules(){
     ruleRows=[...docs.values()].filter(d=>d.kind==="rule").map(d=>{
       let r=d.tree.rule,aid=r.assessment_choices?.automated?.assessment;
       let linked=aid?docs.get("assessment:"+aid):undefined;
-      let status=linked?"automated":aid?"needs-review":"not-automated";
-      return {id:String(r.id),title:String(r.title||r.id),severity:String(r.severity||"unknown"),version:r.version||"",aliases:(r.identifiers||[]).map(x=>x.value).filter(Boolean),aid,linked,status,stig:stigForRule(d)};
+      const closure=aid?assessmentReferenceClosure(aid):null;
+      let status=closure?(closure.ready?"automated":"needs-review"):"not-automated";
+      return {id:String(r.id),title:String(r.title||r.id),severity:String(r.severity||"unknown"),version:r.version||"",aliases:(r.identifiers||[]).map(x=>x.value).filter(Boolean),aid,linked,status,reason:closure?.reason||"",stig:stigForRule(d)};
     }).sort((a,b)=>a.id.localeCompare(b.id));
   }
   const active=()=>ruleRows.find(r=>r.id===chosen);
@@ -116,7 +139,7 @@
   function flag(r){
     if(candidate.has(r.id))return '<span class="tag orange">AI candidate? Human proposal only</span>';
     if(r.status==="automated")return '<span class="tag green">Automated Assessment</span>';
-    if(r.status==="needs-review")return '<span class="tag orange">Assessment link not loaded</span>';
+    if(r.status==="needs-review")return '<span class="tag orange" title="'+esc(r.reason||"Assessment source unavailable")+'">Assessment reference unresolved</span>';
     return '<span class="tag orange">No automation link in loaded Rule</span>';
   }
   function library(){
@@ -629,8 +652,16 @@
     $("title").textContent=r.title;
     $("state").textContent="No scanner connected";
     const d=doc();
-    if(!d){$("content").innerHTML='<section class="card"><h3>Rule loaded · Assessment unavailable</h3><p>'+esc(r.aid?"Linked Assessment "+r.aid+" was not imported.":"No automated Assessment link in this Rule.")+'</p><p>Import its Assessment YAML to enable graphical editing, or inspect the Rule in your source file.</p><button id="suggest" class="button">Mark as proposed automation candidate</button></section>';$("suggest").onclick=()=>{const why=prompt("Reviewer rationale for possible automation (proposal only)");if(why){candidate.set(r.id,why);library();display("Candidate proposal saved in browser session")}};return}
-    $("notice").textContent="Imported source: "+d.origin+" · Draft-only. No authoritative schema verification or scanner evaluation.";
+    if(!d){
+      const linked=Boolean(r.aid);
+      $("content").innerHTML='<section class="card"><h3>'+esc(linked?"Automated Assessment source not loaded":"No automated Assessment selected")+'</h3>'+
+        '<p>'+esc(linked?"The Rule references "+r.aid+", but its source is not in the current library. This is not evidence that the Rule is manual-only.":"This loaded Rule has no automated Assessment choice.")+'</p>'+
+        '<p>'+esc(linked?"Import the referenced Assessment YAML to inspect its Tests; references are never silently replaced.":"You can propose automation or import an Assessment.")+'</p>'+
+        (linked?'':'<button id="suggest" class="button">Mark as proposed automation candidate</button>')+'</section>';
+      if(!linked)$("suggest").onclick=()=>{const why=prompt("Reviewer rationale for possible automation (proposal only)");if(why){candidate.set(r.id,why);library();display("Candidate proposal saved in browser session")}};
+      return;
+    }
+    $("notice").textContent=(r.status==="needs-review"?r.reason+" · ":"")+"Imported source: "+d.origin+" · Draft-only. No authoritative schema verification or scanner evaluation.";
     let html=view==="guided"?wizard():view==="graphical"?overview():view==="source"?sourceView():view==="split"?'<div class="split"><div>'+overview()+'</div>'+rawEditor()+'</div>':fixtures();
     $("content").innerHTML=html;
     $("content").querySelectorAll("[data-select-test]").forEach(b=>b.onclick=()=>{selectedTest=b.dataset.selectTest;render();if(innerWidth<780)$("test-inspector")?.scrollIntoView({block:"start"})});
