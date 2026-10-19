@@ -1324,7 +1324,7 @@
     const op=node?.all?"all":node?.any?"any":null;
     if(!op)return '<p class="warning">Unsupported expression; edit in Source.</p>';
     const kids=node[op],encoded=encodeURIComponent(JSON.stringify(path));
-    const positions=kids.flatMap((n,i)=>i<kids.length-1&&n?.test&&kids[i+1]?.test?
+    const positions=kids.flatMap((n,i)=>kids.length>=3&&i<kids.length-1&&n?.test&&kids[i+1]?.test?
       [{i,label:(a.tests[n.test]?.test_title||n.test)+" + "+(a.tests[kids[i+1].test]?.test_title||kids[i+1].test)}]:[]);
     return '<div class="logic-group generic-logic-node"><div class="generic-logic-heading">'+
       '<strong>'+(op==="all"?"AND — every branch required":"OR — any branch may succeed")+'</strong>'+
