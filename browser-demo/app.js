@@ -384,18 +384,18 @@
     less_than_or_equal:"is at most",
     greater_than:"is greater than",
     less_than:"is less than",
-    require:"How many must exist and match? (require)",
+    require:"How many must exist and match?",
     for_each:"Repeat this check for each entry (for_each)",
     fields:"Fields inside this record (fields)",
-    object:"Where the data comes from (Object)",
+    object:"Where to look",
     set:"How collections are combined (set)",
     operands:"Collections to combine (operands)",
     filters:"Which collected entries are included or excluded? (filters)",
-    select:"Which entries should be selected? (select)",
+    select:"Choose what to examine",
     collect:"How the data is collected (collect)",
     expression:"How this value is calculated (expression)",
-    state:"Condition that must be satisfied (State)",
-    states:"What the collected data must satisfy (States)",
+    state:"Expected condition",
+    states:"What must be true",
     and:"All of these must be true (and)",
     or:"At least one of these must be true (or)",
     record:"Structured value with named fields (record)",
@@ -708,7 +708,7 @@
     const input=isBool?'<span class="help">Boolean comparison; use Source to change the value.</span>':
       '<input id="predicate-value" type="text" class="predicate-value" data-field="'+fieldPath+'" value="'+esc(String(value))+'" aria-label="Expected value for '+esc(name)+'" spellcheck="false">';
     return '<div class="inline-predicate" aria-label="Edit expected condition">'+
-      '<div class="predicate-heading">Check (State)</div>'+
+      '<div class="predicate-heading">What must be true</div>'+
       '<div class="predicate-grid">'+
       '<div class="predicate-part"><label>Field</label><code class="field-name">'+esc(name)+'</code></div>'+
       '<div class="predicate-part"><label for="predicate-operation">Must</label><select id="predicate-operation" data-operation="'+opPath+'" aria-label="Comparison for '+esc(name)+'">'+opChoices+'</select></div>'+
@@ -849,7 +849,7 @@
     return header+'<p class="warning">No directly displayable command string is present. Inspect the complete collection source below.</p></div>';
   }
   function combinedReading(a,id,t){
-    const from=humanCollection(a,t),shape=simpleMatchShape(t),counts=resultCountExplanation(t.collected_items_require);
+    const from=humanCollection(a,t),shape=simpleMatchShape(t),requireKey=Object.hasOwn(t,"require")?"require":"collected_items_require",counts=resultCountExplanation(t[requireKey]);
     const mode=t.states_match==="any"?"At least one alternative must match":t.states_match==="all"?"All alternatives must match":t.states_match==="none"?"No alternative may match":t.states_match==="one"?"Exactly one alternative must match":"State combination shown in details";
     return '<section class="combined-check" aria-label="Readable test description">'+
       '<h4>What this check means</h4>'+
@@ -858,7 +858,7 @@
       (shape?oneFieldEditor(id,t):recordFieldEditor(id,t)||alternativeValuesEditor(id,t)||
         '<div class="condition-readonly"><strong>Conditions (States)</strong><p>'+esc(summarizeTest(t))+'</p><p class="help">Open full details to edit nested conditions.</p></div>')+
       '<div class="quick-results"><label>How many results must be found and match? (collected_items_require)</label>'+
-      requirementSelect(["assessment","tests",id,"collected_items_require"],t.collected_items_require,"Results that must be found and match")+
+      requirementSelect(["assessment","tests",id,requireKey],t[requireKey],"Results that must be found and match")+
       '<details class="result-explanation"><summary>What does this mean?</summary>'+
       '<p><strong>Must be found:</strong> '+esc(counts.found)+'</p>'+
       '<p><strong>Must match:</strong> '+esc(counts.match)+'</p>'+
