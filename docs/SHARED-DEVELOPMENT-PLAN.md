@@ -1,6 +1,6 @@
 # Shared Development Plan — SCAP-NG Assessment Editor
 
-**Updated:** 2026-10-18  
+**Updated:** 2026-10-19  
 **Status:** A **static pre-alpha browser demonstration** is implemented and published via GitHub Pages (18 Oct); a full source-preserving editor, tested SCAP-NG evaluator, interactive agent backend and offline VS Code extension are **not** implemented/validated. New commits must cite real GitHub issues.  
 **Repository:** `vanderpol/scap-ng-editor` (`main`)  
 **Primary work item:** [Assessment-first MVP #2](https://github.com/vanderpol/scap-ng-editor/issues/2)  
@@ -10,6 +10,12 @@
 
 > **The shared contract for ChatGPT, Codex, and human contributors.** Read this file and root `AGENTS.md` before beginning development. Commit updates to this file alongside meaningful implementation milestones. The **repository** is the communication medium; chat prompts are not the durable project specification. This file is not an autonomous job queue or a signal that a task is running.
 
+## Guided standalone authoring milestone — 19 October 2026
+
+- **Tested core multi-check slice [#14](https://github.com/vanderpol/scap-ng-editor/issues/14):** `My Assessments → New Assessment` can create a standalone RHEL login-banner+permissions draft with **3 Tests / 2 capabilities / 5 State predicates**: two separately collected `independent.textfilecontent54` text-line Tests, plus one `unix.file` Test with root owner and forbidden group/other write fields (three States combined `states_match: all`). The Assessment combines all three named Tests with `evaluate.all` (editable to `any` with warning); Test ID edits atomically update expression leaf references. Text and file path changes update appropriate multiple source paths. One-check banner pilot also remains available.
+- **Evidence:** [Chrome smoke CI PASS](https://github.com/vanderpol/scap-ng-editor/actions/runs/39237196499) on `bf2883637629e08d2e22feba25d8293f6dc33e15`; standalone multi-check source/Guided roundtrip, editable Test ID/references, both text lines, path, and resulting State/logic graph all asserted. Deployment at that commit was pending when recorded; verify separately. The test validates **UI/YAML parsing and shape**, not full 0.4-A schema/capability semantics or any scanner result.
+- **Critical next step:** generalize beyond the fixed RHEL preset: goal-derived Test IDs; fully pinned searchable capability catalog; ability to add/remove arbitrary Tests and States, select capability-native fields/values, and edit nested AND/OR with explicit source/reference safeguards. Enforce the complete schema and native capability contracts before calling generated content valid. Current browser demo is not a source-preserving editor and is not scanner-verified.
+- **Explicit priority decision:** [cross-Object Variables / collect→transform→inspect research #15](https://github.com/vanderpol/scap-ng-editor/issues/15) is **deferred until the rest of Guided authoring works**. Do not expand the Thursday demo scope or mutate the 0.4-A schema to demonstrate it; retain account→initialization-file provenance and global-vs-per-account cardinality challenge for later research.
 ## Editable field completeness — 19 October 2026
 
 - **Owner-wide acceptance requirement [#12](https://github.com/vanderpol/scap-ng-editor/issues/12):** Every field/key editable in authored SCAP-NG content must have a corresponding graphical editing control, with version-pinned dropdowns for finite vocabularies and text/other typed inputs for unconstrained values. This is **not yet implemented comprehensively**; audit nested mapping keys, all six sample cases and structural changes. Do not treat raw Source as a substitute or conflate form editing with tested scanner validation.
