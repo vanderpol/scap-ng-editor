@@ -120,7 +120,7 @@ try {
     'Windows Registry capability must reveal hive/key/name selectors');
   assert.equal(await page.locator('#generic-path-label').innerText(),'Windows Registry key');
   await page.locator('#generic-hive').selectOption('local_machine');
-  await page.locator('#generic-path').fill('SOFTWARE\ExampleVendor\Security');
+  await page.locator('#generic-path').fill('SOFTWARE\\ExampleVendor\\Security');
   await page.locator('#generic-registry-name').fill('SecurityMode');
   await page.locator('#generic-field').selectOption('type');
   assert.equal(await page.locator('#generic-value').evaluate(e=>e.tagName),'SELECT',
@@ -142,7 +142,7 @@ try {
   const reg=crossTests['registry-setting-uses-string-type-test'];
   assert.equal(reg.capability,'windows.registry');
   assert.equal(reg.object.select.hive.equals,'local_machine');
-  assert.equal(reg.object.select.key.equals,'SOFTWARE\ExampleVendor\Security');
+  assert.equal(reg.object.select.key.equals,'SOFTWARE\\ExampleVendor\\Security');
   assert.equal(reg.object.select.name.equals,'SecurityMode');
   assert.equal(reg.states[0].type.equals,'string');
   assert.equal(reg.states[1].hive.equals,'local_machine');
