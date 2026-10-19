@@ -58,6 +58,64 @@ try {
   assert.equal(standaloneTest.require,'at_least_one_exists_and_all_match');
   assert.equal(standaloneTest.object.collect.multiline,true);
   assert.equal(await page.locator('[data-standalone="custom.rhel-login-banner-required-line"]').count(),1);
+  // Guided complexity gate: three Tests, two capabilities, and three independent
+  // unix.file State predicates on one collected file. No STIG is associated.
+  await page.locator('#new-assessment').click();
+  await page.locator('#create-id').fill('custom.rhel-banner-and-file-protection');
+  await page.locator('#create-title').fill('RHEL banner must contain two notices and prevent non-root edits');
+  await page.locator('#create-line').fill('Authorized users only.');
+  await page.locator('#create-scope').selectOption('protected');
+  await page.locator('#create-extra-line').fill('Activity may be monitored.');
+  await page.locator('#standalone-create button[type="submit"]').click();
+  assert((await page.locator('#crumb').innerText()).includes('MY ASSESSMENTS'),
+    'complex standalone draft must not need a STIG Rule');
+  assert((await page.locator('#content').innerText()).includes('Checks derived from your goal'),
+    'complex draft should explain its components');
+  const idsBefore=await page.locator('[data-rename-test]').evaluateAll(es=>es.map(e=>e.value));
+  assert.equal(idsBefore.length,3,'complex draft must display three editable Test names');
+  await page.locator('[data-rename-test]').first().fill('rhel-banner-authorized-notice-test');
+  await page.locator('[data-rename-test]').first().press('Tab');
+  await page.locator('[data-step="1"]').click();
+  assert((await page.locator('#content').innerText()).includes('unix.file'),
+    'file protection prompts must come from the selected unix.file capability');
+  await page.locator('#multi-path').fill('/etc/issue.net');
+  await page.locator('#multi-path').press('Tab');
+  await page.locator('[data-step="2"]').click();
+  assert.equal(await page.locator('[data-multi-line]').count(),2,
+    'two independent text checks must have separate, editable required lines');
+  await page.locator('[data-multi-line]').last().fill('All connections may be monitored.');
+  await page.locator('[data-multi-line]').last().press('Tab');
+  assert.equal(await page.locator('select[aria-label="Group may write"]').inputValue(),'false');
+  assert.equal(await page.locator('select[aria-label="Others may write"]').inputValue(),'false');
+  assert.equal(await page.locator('select[aria-label="How should conditions on the same file combine?"]').inputValue(),'all');
+  await page.locator('[data-step="3"]').click();
+  assert.equal(await page.locator('#multi-logic').inputValue(),'all');
+  await page.locator('[data-view="source"]').click();
+  const multiYaml=await page.locator('#rawyaml').inputValue();
+  const complex=await page.evaluate(x=>window.jsyaml.load(x),multiYaml);
+  const multi=complex.assessment,all=multi.evaluate.all;
+  assert.equal(Object.keys(multi.tests).length,3);
+  assert.deepEqual(Object.values(multi.tests).map(x=>x.capability),
+    ['independent.textfilecontent54','independent.textfilecontent54','unix.file']);
+  assert.equal(all.length,3);
+  assert.deepEqual(all.map(x=>x.test),Object.keys(multi.tests),
+    'renaming the first Test must also update its evaluate reference atomically');
+  assert.equal(multi.tests['rhel-login-banner-second-required-line-test'].states[0].text.equals,
+    'All connections may be monitored.');
+  const permit=multi.tests['rhel-login-banner-file-protection-test'];
+  assert.equal(permit.object.select.full_path.equals,'/etc/issue.net');
+  assert.equal(permit.states_match,'all','three fields must match the same collected Item');
+  assert.deepEqual(permit.states.map(x=>Object.keys(x)[0]),['owner_uid','group_write','other_write']);
+  assert.deepEqual(permit.states.map(x=>Object.values(x)[0].equals),[0,false,false]);
+  assert.deepEqual(Object.values(multi.tests).map(t=>t.object.select.full_path.equals),
+    ['/etc/issue.net','/etc/issue.net','/etc/issue.net']);
+  assert.equal(permit.require,'at_least_one_exists_and_all_match');
+  await page.locator('[data-view="guided"]').click();
+  assert((await page.locator('#content').innerText()).includes('Checks derived from your goal'),
+    'complex draft must render back in Guided after round-trip');
+  await page.locator('[data-step="4"]').click();
+  assert((await page.locator('#content').innerText()).includes('2 capabilities, 3 Tests, 5 expected State predicates'),
+    'review should distinguish states, Tests and capability count');
   await page.locator('[data-filter="all"]').click();
   assert.equal(await page.locator('.stig-toggle').count(),4,'All must show STIG headings, not a flat Rule list');
   assert.equal(await page.locator('.stig-rules').count(),0,'All should not render any Rules before STIG selection');
