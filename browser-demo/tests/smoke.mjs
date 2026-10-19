@@ -162,6 +162,39 @@ try {
   assert.deepEqual(changedRegistry.assessment.tests['audit-log-owned-by-root-test'],owner,
     'changing one Registry selector must not rewrite the Unix-file Test');
 
+  // A nested branch must serialize actual all/any expression nodes, not an
+  // English summary or a flattened union of same-Item expected conditions.
+  await page.locator('[data-view="guided"]').click();
+  assert.equal(await page.locator('[data-generic-pair]').count(),1);
+  await page.locator('[data-generic-pair]').selectOption('1');
+  await page.locator('[data-generic-nest]').click();
+  await page.locator('[data-view="source"]').click();
+  const nested=await page.evaluate(raw=>window.jsyaml.load(raw),await page.locator('#rawyaml').inputValue());
+  assert.equal(nested.assessment.evaluate.all.length,2);
+  assert.equal(nested.assessment.evaluate.all[0].test,'audit-log-owned-by-root-test');
+  assert.deepEqual(nested.assessment.evaluate.all[1].any.map(x=>x.test),[
+    'the-editor-link-resolves-to-an-approved-binary-test','registry-setting-uses-string-type-test'
+  ],'native logic should preserve A AND (B OR C)');
+  await page.locator('[data-view="guided"]').click();
+  const branch=page.locator('[data-generic-group-op]');
+  assert.equal(await branch.count(),1);
+  page.once('dialog',dialog=>dialog.accept());
+  await branch.selectOption('all');
+  await page.locator('[data-view="source"]').click();
+  const reordered=await page.evaluate(raw=>window.jsyaml.load(raw),await page.locator('#rawyaml').inputValue());
+  assert.equal(reordered.assessment.evaluate.all[1].all.length,2,
+    'author can change inner OR to AND without rewriting outer AND');
+  await page.locator('[data-view="guided"]').click();
+  page.once('dialog',dialog=>dialog.accept());
+  await page.locator('[data-generic-group-op]').selectOption('any');
+  page.once('dialog',dialog=>dialog.accept());
+  await page.locator('[data-generic-remove-test="registry-setting-uses-string-type-test"]').click();
+  await page.locator('[data-view="source"]').click();
+  const pruned=await page.evaluate(raw=>window.jsyaml.load(raw),await page.locator('#rawyaml').inputValue());
+  assert.deepEqual(pruned.assessment.evaluate.all.map(x=>x.test),[
+    'audit-log-owned-by-root-test','the-editor-link-resolves-to-an-approved-binary-test'
+  ],'unlinking a Test inside nested logic must collapse unary groups and retain other branches');
+
   // Original RHEL walkthrough remains optional and separate from blank flow.
   await page.locator('#new-assessment').click();
   await page.locator('#try-example').click();
