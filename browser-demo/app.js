@@ -306,7 +306,7 @@
     library();render();
   }
   function tabs(){
-    $("tabs").querySelectorAll("[data-view]").forEach(e=>{e.classList.toggle("selected",e.dataset.view===view);e.disabled=!(doc()||manualDoc()&&e.dataset.view==="source")});
+    $("tabs").querySelectorAll("[data-view]").forEach(e=>{e.classList.toggle("selected",e.dataset.view===view);e.disabled=!(doc()||manualDoc())||(manualDoc()&&e.dataset.view!=="graphical"&&e.dataset.view!=="source")});
     $("export").disabled=!(doc()||manualDoc());$("original").disabled=!(doc()||manualDoc());
   }
   function setView(name){if(!doc()&&!manualDoc())return;
@@ -883,8 +883,8 @@
     e.target.value="";indexRules();library();saveState();if(!chosen&&ruleRows.length)open(ruleRows[0].id);else render();
     if(imported)display("Imported "+imported+" source document(s). This is a local browser draft.");
   };
-  $("export").onclick=()=>{if(!doc()&&!manualDoc())return;let raw=$("rawyaml");if(raw&&raw.value!==doc().source){display("Apply source edits before exporting",true);return}download(doc().name,doc().source,"text/yaml");display("YAML downloaded to your device")};
-  $("original").onclick=()=>{const d=doc();if(d&&confirm("Restore this Assessment to its original loaded source?")){const p=parse(d.original);d.source=d.original;d.tree=p.tree;d.changed=false;saveState();indexRules();library();render();display("Original restored.")}};
+  $("export").onclick=()=>{const d=doc()||manualDoc();if(!d)return;let raw=$("rawyaml");if(raw&&raw.value!==d.source){display("Apply source edits before exporting",true);return}download(d.name,d.source,"text/yaml");display("YAML downloaded to your device")};
+  $("original").onclick=()=>{const d=doc()||manualDoc();if(d&&confirm("Restore this Assessment to its original loaded source?")){const p=parse(d.original);d.source=d.original;d.tree=p.tree;d.changed=false;saveState();indexRules();library();render();display("Original restored.")}};
   async function init(){
     if(!window.jsyaml){display("YAML parser asset did not load — app cannot parse files.",true);return}
     display("Loading six pinned source-backed Rule/Assessment examples from public GitHub…");
