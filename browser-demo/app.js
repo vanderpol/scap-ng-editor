@@ -923,6 +923,13 @@
   // It does not simulate a scanner or assert full-file banner equivalence.
   const BANNER_TEST="rhel-login-banner-required-line-test";
   const linePattern=value=>"^"+Array.from(value).map(c=>".*+?^$()[]{}|\\".includes(c)?"\\"+c:c).join("")+"$";
+  function suggestedSourceName(capability,goal,filePath){
+    const subject=String(goal||"the required setting").replace(/^the\s+/i,"").split(/\s+(?:must|should|shall|is required to)\b/i)[0].replace(/[.!?]+$/,"").trim()||"required setting";
+    if(capability==="independent.textfilecontent54")return "Read "+subject+" in "+filePath;
+    if(capability==="unix.symlink")return "Resolve symbolic link "+filePath;
+    if(capability==="windows.registry")return "Read registry setting "+filePath;
+    return "Collect "+subject+" with "+capability;
+  }
   function buildBannerAssessment(id,title,filePath,requiredLine,capability,sourceTitle){
     if(capability!=="independent.textfilecontent54")throw Error("This Guided preset does not yet support that capability.");
     if(!sourceTitle.trim())throw Error("Name the data source in plain language.");
@@ -970,7 +977,7 @@
       '<option value="windows.wmi.query" disabled>Query Windows system information — windows.wmi.query (coming later)</option></select>'+
       '<p class="help">The selected capability determines the source prompts. Other capabilities are not yet available in this authoring preset.</p>'+
       '<label for="create-id">Suggested Assessment ID (editable)</label><input name="id" id="create-id" required value="custom.rhel-login-banner-required-line" spellcheck="false">'+
-      '<label for="create-source-title">Name this data source (editable)</label><input name="sourceTitle" id="create-source-title" required value="Read required login-banner text in /etc/issue">'+
+      '<label for="create-source-title">Name this data source (editable)</label><input name="sourceTitle" id="create-source-title" required value="Read RHEL login banner in /etc/issue">'+
       '<p class="help">This is an inline collection and needs no Object ID. Reusable shared Objects will get capability-specific, editable names ending in -object.</p>'+
       '<label for="create-file">Which text file should be read?</label><input name="file" id="create-file" required value="/etc/issue" spellcheck="false">'+
       '<p class="help">/etc/issue is a common local login-banner file. It does not automatically prove which banner is shown by SSH or another login service.</p>'+
@@ -978,6 +985,13 @@
       '<p class="help">This initial preset requires at least one complete matching line; it does not compare the entire file or render escape sequences.</p>'+
       '<button class="button primary" type="submit">Create draft and open Guided →</button></form>'+
       '<p class="help" id="create-error" role="alert"></p></section>';
+    const goal=$("create-title"),sourceName=$("create-source-title"),fileName=$("create-file"),capability=$("create-capability");
+    let sourceNameManuallyEdited=false;
+    sourceName.oninput=()=>{sourceNameManuallyEdited=true};
+    const suggest=()=>{
+      if(!sourceNameManuallyEdited)sourceName.value=suggestedSourceName(capability.value,goal.value,fileName.value);
+    };
+    goal.oninput=suggest;fileName.oninput=suggest;capability.onchange=suggest;
     $("standalone-create").onsubmit=e=>{
       e.preventDefault();
       const form=e.currentTarget;
