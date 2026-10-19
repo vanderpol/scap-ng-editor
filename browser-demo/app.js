@@ -102,11 +102,11 @@
   function readState(){
     try{
       const stored=JSON.parse(localStorage.getItem("scapng-browser-drafts-v1")||"null");
-      if(Array.isArray(stored))for(const d of stored){try{const key=addDoc(d.name,d.source,"Local browser draft",true,d.sourcePath||null);docs.get(key).guidedGeneric=d.guidedGeneric===true}catch(e){}}
+      if(Array.isArray(stored))for(const d of stored){try{const key=addDoc(d.name,d.source,"Local browser draft",true,d.sourcePath||null);docs.get(key).guidedGeneric=d.guidedGeneric===true;docs.get(key).guidedPlatform=["linux","windows"].includes(d.guidedPlatform)?d.guidedPlatform:null}catch(e){}}
     }catch(e){}
   }
   function saveState(){
-    try{localStorage.setItem("scapng-browser-drafts-v1",JSON.stringify([...docs.values()].filter(d=>d.origin==="Local import"||d.origin==="Locally created draft"||d.origin==="Local browser draft"||d.changed).map(d=>({name:d.name,source:d.source,sourcePath:d.sourcePath,guidedGeneric:d.guidedGeneric===true}))))}catch(e){}
+    try{localStorage.setItem("scapng-browser-drafts-v1",JSON.stringify([...docs.values()].filter(d=>d.origin==="Local import"||d.origin==="Locally created draft"||d.origin==="Local browser draft"||d.changed).map(d=>({name:d.name,source:d.source,sourcePath:d.sourcePath,guidedGeneric:d.guidedGeneric===true,guidedPlatform:d.guidedPlatform||null}))))}catch(e){}
   }
   const STIG_NAMES=Object.freeze({
     "rhel_9":"RHEL 9",
@@ -1155,6 +1155,9 @@
 
 
   // Guided authoring field lists are loaded from immutable SCAP-NG mappings.
+  const GUIDED_PLATFORM_CAPS=Object.freeze({linux:Object.freeze(["independent.textfilecontent54","unix.file","unix.symlink"]),windows:Object.freeze(["windows.registry"])});
+  const guidedAllowedCapability=(platform,capability)=>Boolean(GUIDED_PLATFORM_CAPS[platform]?.includes(capability));
+  const guidedPlatformLabel=platform=>guidedVocabulary?.platform_labels?.[platform]||platform;
   const guidedMaps=new Map();
   let guidedVocabulary=null;
   let guidedMapError="Capability mappings not loaded.";
@@ -1201,7 +1204,9 @@
          vocabulary.schema_version!==c.specificationVersion||
          vocabulary.language!=="en"||vocabulary.normative!==false||
          !vocabulary.term_scopes?.["test.require"]?.label||
-         !vocabulary.term_scopes?.["state.field.require"]?.label)
+         !vocabulary.term_scopes?.["state.field.require"]?.label||
+         !vocabulary.term_scopes?.["authoring.target_platform"]?.prompt||
+         !["linux","windows"].every(p=>typeof vocabulary.platform_labels?.[p]==="string"))
         throw Error("Vocabulary incompatible with pinned 0.4-A schema");
       for(const capability of c.capabilities){
         if(!vocabulary.capabilities?.[capability]?.label)
@@ -1235,6 +1240,14 @@
     $("content").innerHTML='<section class="card"><h3>What security requirement do you want to check?</h3>'+
       '<p>Describe your goal. Then build independent checks using supported capabilities.</p>'+
       '<form id="blank-create" class="standalone-create">'+
+      '<label for="blank-platform">'+esc(guidedPrompt("authoring.target_platform","Which operating system will this Assessment check?"))+'</label>'+
+      '<select id="blank-platform" name="platform" required>'+
+      '<option value="" selected disabled>Choose target platform…</option>'+
+      '<option value="linux">'+esc(guidedPlatformLabel("linux"))+'</option>'+
+      '<option value="windows">'+esc(guidedPlatformLabel("windows"))+'</option>'+
+      '<option value="macos" disabled>'+esc(guidedPlatformLabel("macos"))+' — Guided checks not ready</option>'+
+      '<option value="solaris" disabled>'+esc(guidedPlatformLabel("solaris"))+' — Guided checks not ready</option></select>'+
+      '<p class="help">Only capability forms already supported for the selected platform will appear. This does not add or infer SCAP-NG applicability.</p>'+
       '<label for="blank-goal">'+esc(guidedPrompt("assessment.assessment_title","Security requirement"))+'</label>'+
       '<textarea name="goal" id="blank-goal" required rows="3" placeholder="Example: Audit logs must be owned by root and not writable by other users"></textarea>'+
       '<label for="blank-id">Suggested Assessment ID (editable)</label>'+
@@ -1252,7 +1265,8 @@
     $("blank-create").onsubmit=e=>{
       e.preventDefault();
       try{
-        const title=goal.value.trim(),identity=id.value.trim();
+        const title=goal.value.trim(),identity=id.value.trim(),platform=$("blank-platform").value;
+        if(!Object.hasOwn(GUIDED_PLATFORM_CAPS,platform))throw Error("Choose a target platform with supported Guided check forms.");
         if(!title)throw Error("Enter a security requirement.");
         if(!assessmentIdValid(identity))throw Error("Use a lowercase Assessment ID (letters, digits, periods or hyphens).");
         if(docs.has("assessment:"+identity))throw Error("Assessment ID already exists.");
@@ -1263,7 +1277,7 @@
         }};
         const raw=jsyaml.dump(tree,{lineWidth:105,noRefs:true}),p=parse(raw);
         const key=addDoc(p.id+".assessment.yaml",raw,"Locally created draft");
-        docs.get(key).guidedGeneric=true;docs.get(key).changed=true;
+        docs.get(key).guidedGeneric=true;docs.get(key).guidedPlatform=platform;docs.get(key).changed=true;
         standaloneId=p.id;chosen=null;creatingStandalone=false;step=0;view="guided";
         saveState();library();render();
         display("Blank Assessment created. Add a first Test before exporting.");
@@ -1400,6 +1414,7 @@
     if(!title.trim()||!/^[a-z0-9]+(?:-[a-z0-9]+)*-test$/.test(id))
       throw Error("Enter a check description and lowercase Test ID ending -test.");
     if(a.tests[id])throw Error("That Test ID is already used.");
+    if(!guidedAllowedCapability(doc()?.guidedPlatform,capability))throw Error("That capability is not supported for the selected target platform.");
     if(!guidedMaps.has(capability))throw Error("Capability mapping unavailable.");
     if(capability!=="windows.registry"&&(!path.startsWith("/")||path.length<2||/[\r\n]/.test(path)))
       throw Error("Select a complete absolute Linux file path.");
@@ -1443,6 +1458,8 @@
   }
   function genericTreeReady(a){
     const entries=Object.entries(a.tests||{});
+    const platform=doc()?.guidedPlatform;
+    if(platform&&entries.some(([,t])=>!guidedAllowedCapability(platform,t.capability)))return false;
     if(!entries.every(([,t])=>{
       const map=guidedMaps.get(t.capability),select=t.object?.select;
       if(!map||!select||t.object.capability!==t.capability||!Array.isArray(t.states)||
@@ -1499,7 +1516,8 @@
     if(!genericTreeReady(a))return '<section class="card"><h3>Source structure needs review</h3>'+
       '<p>This Assessment contains a more advanced or inconsistent expression than the bounded Guided authoring builder can safely edit. Source is preserved.</p>'+
       '<button id="gotoSource" class="button">Inspect YAML</button></section>';
-    const caps=[...guidedMaps.keys()].map(capability=>[capability,guidedCapabilityLabel(capability,capability)]);
+    const platform=doc()?.guidedPlatform;
+    const caps=(GUIDED_PLATFORM_CAPS[platform]||[]).map(capability=>[capability,guidedCapabilityLabel(capability,capability)]);
     const capabilities=caps.filter(([key])=>guidedMaps.has(key));
     const capList=capabilities.map(([key,name])=>'<option value="'+esc(key)+'">'+esc(name)+' — '+esc(key)+'</option>').join("");
     const op=a.evaluate?.any?"any":"all";
@@ -1547,8 +1565,13 @@
         (isText?'<p>Text collection is pinned to exact complete-line search with explicit options and escaped punctuation.</p>':"")+
         '<p class="help">Detailed edits remain available through Source; no hidden semantic changes are applied.</p></details></section>';
     }).join("");
-    const addDisabled=capabilities.length!==4;
+    const addDisabled=capabilities.length===0||capabilities.length!==(GUIDED_PLATFORM_CAPS[platform]?.length||0);
     return '<section class="card"><h3>Guided Assessment — started from your goal</h3>'+
+      '<label for="generic-platform">'+esc(guidedTerm("authoring.target_platform","Target platform"))+'</label>'+
+      '<select id="generic-platform" '+(entries.length?"disabled":"")+'>'+
+      '<option value="" '+(!platform?"selected":"")+' disabled>Choose platform</option>'+
+      ["linux","windows"].map(p=>'<option value="'+p+'" '+(platform===p?"selected":"")+'>'+esc(guidedPlatformLabel(p))+'</option>').join("")+'</select>'+
+      '<p class="help">'+(entries.length?"Platform is locked while checks exist. Remove all Tests or create a separate Assessment to switch platforms.": "Change the platform before adding your first check.")+'</p>'+
       field(["assessment","assessment_title"],guidedTerm("assessment.assessment_title","Security requirement"),a.assessment_title)+
       field(["assessment","id"],"Assessment ID",a.id)+
       '<p class="help">Not tied to any STIG. The editor will not invent collection results or a scanner verdict.</p>'+
@@ -1564,7 +1587,7 @@
         '<h4>Assessment logic tree</h4>'+genericLogicOutline(a,a.evaluate)+'</section>':"")+
       testRows+
       '<section class="card"><h3>+ Add an independent check</h3>'+
-      (addDisabled?'<p class="warning">'+esc(guidedMapError)+'</p>':'<p class="help">Select a source capability, then describe the expected field or required text.</p>')+
+      (addDisabled?'<p class="warning">'+esc(platform?guidedMapError:"Target platform is not recorded for this older draft. Remove existing Tests or create a new platform-scoped Assessment.")+'</p>':'<p class="help">Showing '+esc(guidedPlatformLabel(platform))+' check types only. Select a source capability, then describe the expected field or required text.</p>')+
       '<form id="generic-add-test" class="standalone-create">'+
       '<label for="generic-check-title">What does this check verify?</label>'+
       '<input id="generic-check-title" required placeholder="Example: The audit log must be owned by root">'+
@@ -1600,6 +1623,16 @@
     const d=doc();
     if(!standaloneId||!d?.guidedGeneric||view!=="guided")return;
     const cap=$("generic-capability"),newField=$("generic-field");
+    const platformInput=$("generic-platform");
+    if(platformInput)platformInput.onchange=()=>{
+      const selected=platformInput.value;
+      if(!Object.hasOwn(GUIDED_PLATFORM_CAPS,selected)){display("Unsupported target platform",true);render();return;}
+      if(Object.keys(d.tree.assessment.tests||{}).length){
+        display("Remove all Tests or create another Assessment before switching platforms.",true);render();return;
+      }
+      d.guidedPlatform=selected;d.changed=true;saveState();render();
+      display("Target platform changed to "+guidedPlatformLabel(selected)+"; no Assessment YAML or Test semantics changed.");
+    };
     const showCapability=()=>{
       if(!cap)return;
       const isText=cap.value==="independent.textfilecontent54",
