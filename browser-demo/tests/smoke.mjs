@@ -65,9 +65,9 @@ try {
   await page.locator('#test-inspector .result-explanation summary').click();
   assert((await page.locator('#test-inspector .combined-check').innerText()).includes('Must be found:'), 'expanded help must explain result existence');
   assert((await page.locator('#test-inspector .combined-check').innerText()).includes('Must match:'), 'expanded help must explain match count independently');
-  await page.locator('#test-inspector .inspector-section').first().locator('summary').click();
+  await page.locator('#test-inspector .inspector-section').first().locator(':scope > summary').click();
   assert((await page.locator('#test-inspector').innerText()).includes('States:'), 'full nested State structure must remain accessible');
-  await page.locator('#test-inspector .inspector-section').last().locator('summary').click();
+  await page.locator('#test-inspector .inspector-section').last().locator(':scope > summary').click();
   const selects = page.locator('#test-inspector .inspector-section').last().locator('select[data-field]');
   assert((await selects.count()) > 0, 'Focused Test editing should offer requirement choices');
   const choices = await selects.first().locator('option').allTextContents();
