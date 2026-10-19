@@ -373,7 +373,7 @@
       '<div class="predicate-part"><label for="predicate-operation">Must</label><select id="predicate-operation" data-operation="'+opPath+'" aria-label="Comparison for '+esc(name)+'">'+opChoices+'</select></div>'+
       '<div class="predicate-part"><label for="predicate-value">Value</label>'+input+'</div>'+
       '</div>'+
-      (matcher.require?'<div class="predicate-quantity"><label>Matching values per result (require)</label>'+
+      (matcher.require?'<div class="predicate-quantity"><label>Within each result (require)</label>'+
         requirementSelect(base.concat("require"),matcher.require,"Field-value matching requirement")+'</div>':
         '')+
       ''+
@@ -453,7 +453,7 @@
       shellCommandDetails(a,id,t)+
       (shape?oneFieldEditor(id,t):
         '<div class="condition-readonly"><strong>Conditions (States)</strong><p>'+esc(summarizeTest(t))+'</p><p class="help">Open full details to edit nested conditions.</p></div>')+
-      '<div class="quick-results"><label>Matching collected results (collected_items_require)</label>'+
+      '<div class="quick-results"><label>Across collected results (collected_items_require)</label>'+
       requirementSelect(["assessment","tests",id,"collected_items_require"],t.collected_items_require,"Results that must be found and match")+
       '<details class="result-explanation"><summary>What does this mean?</summary>'+
       '<p><strong>Must be found:</strong> '+esc(counts.found)+'</p>'+
