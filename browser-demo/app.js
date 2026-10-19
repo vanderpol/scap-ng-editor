@@ -52,7 +52,7 @@
       return '<div class="interpreter-row">'+label+'<span class="help">Defined by '+esc(shell.variable?"Variable: "+shell.variable:"a source expression")+' — see collection details</span></div>';
     if(typeof shell!=="string")return '<div class="interpreter-row">'+label+'<span class="warning">Unsupported interpreter value; inspect source.</span></div>';
     const allowed=shellChoices&&shellChoicesVersion===documentVersion&&shellChoices.includes(shell);
-    if(!allowed)return '<div class="interpreter-row">'+label+'<code>'+esc(shell)+'</code><span class="help">Read-only: '+esc(shellChoicesVersion!==documentVersion?"No matching pinned vocabulary for this document.":shellChoicesError||"Value not in pinned vocabulary.")+'</span></div>';
+    if(!allowed)return '<div class="interpreter-row">'+label+'<code>'+esc(shell)+'</code><span class="help">Read-only: '+esc(!shellChoices?shellChoicesError:shellChoicesVersion!==documentVersion?"No matching pinned vocabulary for this document.":"Value not in pinned vocabulary.")+'</span></div>';
     const enc=encodeURIComponent(JSON.stringify(path));
     return '<div class="interpreter-row">'+label+'<select class="interpreter-select" data-field="'+enc+'" aria-label="Interpreter">'+
       shellChoices.map(x=>'<option value="'+esc(x)+'" '+(x===shell?"selected":"")+'>'+esc(x)+'</option>').join("")+
