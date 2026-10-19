@@ -137,3 +137,9 @@
 .record-require{grid-column:1/-1}
 .record-editor .help{font-size:11px;margin:7px 0 0}
 @media(max-width:740px){.record-edit-row{grid-template-columns:1fr}.record-require{grid-column:auto}}
+
+/* Repeated scalar alternatives read like an allowed-value list, not a YAML array. */
+.alternative-values{display:flex;flex-wrap:wrap;gap:7px}
+.alternative-row{display:flex;align-items:center;gap:5px;font-size:11px}
+.alternative-row span{color:#607a93}
+.alternative-row input{width:130px;max-width:100%;padding:7px;border:1px solid #bcd1e4;background:#fff;border-radius:6px;font:12px ui-monospace,Consolas,monospace}
