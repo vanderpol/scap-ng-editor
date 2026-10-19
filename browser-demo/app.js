@@ -21,7 +21,7 @@
     ["ms_windows_server_dns/assessments/automated/SV-259345.automated.yaml","assessment"]
   ];
   let docs=new Map(),ruleRows=[],chosen=null,selectedTest=null,view="graphical",step=0,filter="all",search="",message="",dirtySource=false;
-  const expandedStigs=new Set();
+  const expandedStigs=new Set(),searchCollapsedStigs=new Set();
   let sampleText="",candidate=new Map();
   // Load interpreter choices from the exact upstream version-pinned capability mapping.
   // No guessed fallback enum: when unavailable, users can still inspect raw YAML.
@@ -146,7 +146,8 @@
     const choices=[["all","All"],["automated","Automated"],["not-automated","Without automated choice"],["needs-review","Assessment not loaded"],["candidates","Candidates"]];
     $("filters").innerHTML=choices.map(([val,name])=>'<button class="'+(filter===val?"selected":"")+'" data-filter="'+val+'">'+name+'</button>').join("");
     $("filters").querySelectorAll("[data-filter]").forEach(b=>b.onclick=()=>{
-      filter=b.dataset.filter;expandedStigs.clear();library();
+      filter=b.dataset.filter;expandedStigs.clear();searchCollapsedStigs.clear();
+      if(filter==="all"){search="";$("query").value=""}library();
     });
     const matches=ruleRows.filter(r=>{
       if(search&&!(r.id+" "+r.title+" "+r.version+" "+r.aliases.join(" ")+" "+r.stig.name).toLowerCase().includes(search))return false;
@@ -162,7 +163,7 @@
     const groups=[...grouped.values()].sort((a,b)=>a.stig.name.localeCompare(b.stig.name));
     $("counter").textContent=groups.length+" STIGs · "+matches.length+" of "+ruleRows.length+" loaded Rules · partial source catalog";
     $("rules").innerHTML=groups.length?groups.map(({stig,rules})=>{
-      const expanded=Boolean(search)||expandedStigs.has(stig.key),automated=rules.filter(r=>r.status==="automated").length;
+      const expanded=search?!searchCollapsedStigs.has(stig.key):expandedStigs.has(stig.key),automated=rules.filter(r=>r.status==="automated").length;
       return '<section class="stig-group">'+
         '<button class="stig-toggle" data-stig="'+esc(stig.key)+'" aria-expanded="'+expanded+'">'+
         '<span class="stig-arrow">'+(expanded?"▾":"▸")+'</span><span class="stig-title">'+esc(stig.name)+'</span>'+
@@ -173,7 +174,8 @@
           '</button>').join("")+'</div></section>';
     }).join(""):'<div class="empty">No matching loaded Rules.<p>Import Rule and Assessment YAML to broaden your library.</p></div>';
     $("rules").querySelectorAll("[data-stig]").forEach(b=>b.onclick=()=>{
-      const id=b.dataset.stig;if(expandedStigs.has(id))expandedStigs.delete(id);else expandedStigs.add(id);library();
+      const id=b.dataset.stig,which=search?searchCollapsedStigs:expandedStigs;
+      if(which.has(id))which.delete(id);else which.add(id);library();
     });
     $("rules").querySelectorAll("[data-id]").forEach(e=>e.onclick=()=>open(e.dataset.id));
   }
@@ -713,7 +715,7 @@
     const exportSample=$("exportSample");if(exportSample)exportSample.onclick=()=>{try{const s=$("sampleText").value;JSON.parse(s);sampleText=s;download(r.id+"-synthetic-sample.json",s,"application/json");display("Synthetic sample downloaded — no scanner execution performed")}catch(e){display("Sample JSON invalid: "+e.message,true)}};
   }
   function download(name,data,type){const blob=new Blob([data],{type}),url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=name.replace(/[^a-zA-Z0-9_.-]/g,"_");document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),500)}
-  $("query").oninput=e=>{search=e.target.value.toLowerCase();library()};
+  $("query").oninput=e=>{search=e.target.value.toLowerCase();searchCollapsedStigs.clear();library()};
   $("tabs").querySelectorAll("[data-view]").forEach(b=>b.onclick=()=>setView(b.dataset.view));
   $("import").onclick=()=>$("upload").click();
   $("upload").onchange=async e=>{
