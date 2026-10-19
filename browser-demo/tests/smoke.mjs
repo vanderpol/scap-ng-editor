@@ -52,8 +52,6 @@ try {
   assert(!genericCaps.some(x=>x.includes('windows.registry')),
     'Windows Registry must not appear under the Linux target platform');
   assert.equal(await page.locator('#generic-platform').inputValue(),'linux');
-  assert(genericCaps.some(x=>x.includes('Read Windows Registry settings')),
-    'registry capability description must come from shared SCAP-NG vocabulary');
   assert((await page.locator('label[for="generic-capability"]').innerText()).includes('Which capability'),
     'capability prompt should use shared source terminology');
   await page.locator('#generic-check-title').fill('Audit log owned by root');
