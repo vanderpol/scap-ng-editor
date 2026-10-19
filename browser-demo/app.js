@@ -1163,7 +1163,7 @@
        c.specificationVersion!=="0.4.0"||!Array.isArray(c.capabilities))return;
     try{
       const loaded=await Promise.all(c.capabilities.map(async capability=>{
-        if(!["independent.textfilecontent54","unix.file"].includes(capability))throw Error("Unsupported capability "+capability);
+        if(!["independent.textfilecontent54","unix.file","unix.symlink","windows.registry"].includes(capability))throw Error("Unsupported capability "+capability);
         const url="https://raw.githubusercontent.com/"+c.repository+"/"+c.revision+
           "/schema/v0.4.0/capability-mappings/supported/"+capability+".json";
         const res=await fetch(url,{cache:"force-cache"});
@@ -1234,15 +1234,25 @@
     return types.includes("boolean")?"boolean":types.includes("integer")?"integer":
       types.includes("string")?"string":null;
   };
-  const genericFileFields=()=>{
-    const map=guidedMaps.get("unix.file");
+  const guidedStateFields=capability=>{
+    const map=guidedMaps.get(capability);
     if(!map)return [];
-    return [...new Set(Object.values(map.native.state_field_map))].filter(name=>genericSupportedField("unix.file",name));
+    // The registry 'value' field supports several incompatible datatypes.
+    // Do not silently coerce its source value to a string.
+    return [...new Set(Object.values(map.native.state_field_map))].filter(name=>
+      !(capability==="windows.registry"&&name==="value")&&genericSupportedField(capability,name));
   };
-  function genericFieldOptions(selected){
-    return genericFileFields().map(name=>'<option value="'+esc(name)+'" '+(selected===name?"selected":"")+'>'+esc(name.replaceAll("_"," "))+'</option>').join("");
+  function genericFieldOptions(selected,capability="unix.file"){
+    return guidedStateFields(capability).map(name=>'<option value="'+esc(name)+'" '+(selected===name?"selected":"")+'>'+esc(name.replaceAll("_"," "))+'</option>').join("");
   }
-  function genericValue(type,value){
+  function guidedValueEnums(capability,field){
+    const m=guidedMaps.get(capability);
+    return m?.native?.state_value_enums?.[field]||null;
+  }
+  function genericValue(type,value,capability="unix.file",field=""){
+    const enums=guidedValueEnums(capability,field);
+    if(Array.isArray(enums)&&enums.length)return '<select id="generic-value">'+
+      enums.map(x=>'<option value="'+esc(x)+'" '+(String(value)===x?"selected":"")+'>'+esc(x.replaceAll("_"," "))+'</option>').join("")+'</select>';
     if(type==="boolean")return '<select id="generic-value">'+
       ["false","true"].map(x=>'<option value="'+x+'" '+(String(value)===x?"selected":"")+'>'+x+'</option>').join("")+'</select>';
     return '<input id="generic-value" type="'+(type==="integer"?"number":"text")+'" value="'+esc(value??(type==="integer"?0:""))+'" '+(type==="integer"?'step="1"':"")+' required>';
@@ -1260,14 +1270,20 @@
       return Number(raw);
     }
     if(!String(raw).trim())throw Error("Enter an expected value.");
+    const enums=guidedValueEnums(capability,field);
+    if(enums&&!enums.includes(String(raw)))throw Error("Choose a defined value for "+field+".");
     return String(raw);
   }
-  function genericNewTest(a,{title,id,capability,path,line,field,value}){
+  function guidedLocator(t){
+    return t.capability==="windows.registry"?t.object?.select?.key?.equals:
+      t.object?.select?.full_path?.equals;
+  }
+  function genericNewTest(a,{title,id,capability,path,line,field,value,hive,registryName}){
     if(!title.trim()||!/^[a-z0-9]+(?:-[a-z0-9]+)*-test$/.test(id))
       throw Error("Enter a check description and lowercase Test ID ending -test.");
     if(a.tests[id])throw Error("That Test ID is already used.");
     if(!guidedMaps.has(capability))throw Error("Capability mapping unavailable.");
-    if(!path.startsWith("/")||path.length<2||/[\r\n]/.test(path))
+    if(capability!=="windows.registry"&&(!path.startsWith("/")||path.length<2||/[\r\n]/.test(path)))
       throw Error("Select a complete absolute Linux file path.");
     let t;
     if(capability==="independent.textfilecontent54"){
@@ -1280,11 +1296,23 @@
         },
         states:[{text:{equals:line,require:"at_least_one_exists_and_all_match"}}],
         require:"at_least_one_exists_and_all_match",reported_elements:"all"};
-    }else if(capability==="unix.file"){
+    }else if(capability==="unix.file"||capability==="unix.symlink"){
       t={test_title:title.trim(),capability,object:{
-          capability,object_title:"Inspect file properties for "+path,
-          select:{full_path:{equals:path}},filesystem:"local"},
-        states:[{[field]:{equals:genericTypedValue(field,value),require:"at_least_one_exists_and_all_match"}}],
+          capability,object_title:(capability==="unix.file"?"Inspect file properties for ":"Resolve symbolic link ")+path,
+          select:{full_path:{equals:path}},
+          ...(capability==="unix.file"?{filesystem:"local"}:{})},
+        states:[{[field]:{equals:genericTypedValue(field,value,capability),require:"at_least_one_exists_and_all_match"}}],
+        require:"at_least_one_exists_and_all_match",reported_elements:"all"};
+    }else if(capability==="windows.registry"){
+      const map=guidedMaps.get(capability);
+      if(!map.native.selector_value_enums?.hive?.includes(hive))
+        throw Error("Select a supported registry hive from the pinned mapping.");
+      if(!path||/[\r\n]/.test(path)||!registryName||/[\r\n]/.test(registryName))
+        throw Error("Enter a registry key and named value; default-value/null selectors are not yet available.");
+      t={test_title:title.trim(),capability,
+        object:{capability,object_title:"Read registry value "+hive+"\\"+path+"\\"+registryName,
+          select:{hive:{equals:hive},key:{equals:path},name:{equals:registryName}}},
+        states:[{[field]:{equals:genericTypedValue(field,value,capability),require:"at_least_one_exists_and_all_match"}}],
         require:"at_least_one_exists_and_all_match",reported_elements:"all"};
     }else throw Error("Capability not implemented.");
     const old=a.evaluate;
@@ -1298,8 +1326,13 @@
   }
   function genericTreeReady(a){
     const entries=Object.entries(a.tests||{});
-    if(!entries.every(([,t])=>["independent.textfilecontent54","unix.file"].includes(t.capability)&&
-         t.object?.select?.full_path?.equals&&Array.isArray(t.states)))return false;
+    if(!entries.every(([,t])=>
+         guidedMaps.has(t.capability)&&!!guidedLocator(t)&&Array.isArray(t.states)&&
+         t.states.length>=1&&
+         t.states.every(state=>Object.keys(state).length===1&&
+           Object.keys(state).every(key=>genericSupportedField(t.capability,key)))&&
+         (t.states.length<2||["all","any","one","odd"].includes(t.states_match))
+       ))return false;
     const leaves=a.evaluate?.all||a.evaluate?.any||(a.evaluate?.test?[a.evaluate]:[]);
     return leaves.length===entries.length&&leaves.every(x=>x&&typeof x.test==="string"&&a.tests[x.test])&&
       new Set(leaves.map(x=>x.test)).size===leaves.length;
