@@ -220,8 +220,8 @@ try {
     'native PowerShell cmdlet should be visible instead of a raw capability label');
   assert.equal(await page.locator('#test-inspector .record-edit-row').count(),3,
     'Windows TPM record should offer independent field/value rows');
-  assert((await page.locator('#test-inspector .record-fields').innerText()).includes('tpmpresent'),
-    'nested record fields must be visible without expanding the source tree');
+  assert.equal(await page.locator('#test-inspector .record-fields input[data-rename-key]').first().inputValue(),'tpmpresent',
+    'nested record fields must be visible and editable without expanding the source tree');
   await page.locator('#test-inspector .record-edit-row').first().locator('input[data-field]').fill('False');
   await page.locator('#test-inspector .record-edit-row').first().locator('input[data-field]').press('Tab');
   await page.locator('[data-view="source"]').click();
