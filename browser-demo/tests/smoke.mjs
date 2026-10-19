@@ -52,7 +52,7 @@ try {
   assert.equal(await page.locator('.generic-check').count(),1);
   const addState=page.locator('.generic-add-state').first();
   await addState.locator('[data-generic-field-for]').selectOption('other_write');
-  assert.equal(await addState.locator('#generic-value').inputValue(),'false',
+  assert.equal(await addState.locator('[data-generic-value-host] select').inputValue(),'false',
     'file Boolean fields should use true/false dropdowns from pinned type vocabulary');
   await addState.locator('button[type="submit"]').click();
   assert.equal(await page.locator('.generic-state-row').count(),2,
