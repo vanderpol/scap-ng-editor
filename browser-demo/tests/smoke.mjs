@@ -81,7 +81,7 @@ try {
   await page.locator('[data-view="guided"]').click();
   assert(await page.getByText('1 · Understand this requirement').isVisible(), 'guided view must still work');
   await page.locator('[data-view="samples"]').click();
-  assert(await page.locator('.sample-mock > p.warning').isVisible(), 'sample panel must not imply a scanner');
+  assert(await page.locator('p.warning').filter({ hasText: 'NOT CONNECTED' }).first().isVisible(), 'sample panel must not imply a scanner');
   assert(await page.locator('.sample-mock button').isDisabled(), 'sample evaluation must remain disabled');
 
   await openRule('SV-257851');
