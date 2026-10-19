@@ -26,6 +26,12 @@ try {
     assert.equal(await page.locator('[data-stig="'+stig+'"]').count(),1,'STIG group '+stig+' should be present');
   await page.locator('#new-assessment').click();
   assert(await page.locator('#standalone-create').isVisible(),'standalone creation must not require a STIG');
+  assert.deepEqual(await page.locator('#create-capability option:not([disabled])').allTextContents(),
+    ['Read and match text in a file — independent.textfilecontent54'],
+    'the first Guided preset must only enable a supported capability');
+  assert.equal(await page.locator('#create-source-title').inputValue(),
+    'Read required login-banner text in /etc/issue',
+    'source description must be capability-specific and editable');
   await page.locator('#create-line').fill('Authorized users only. (Example+)');
   await page.locator('#standalone-create button[type="submit"]').click();
   assert((await page.locator('#crumb').innerText()).includes('MY ASSESSMENTS'),'new Assessment must be independent');
@@ -40,6 +46,8 @@ try {
   const standaloneTest=standalone.assessment.tests['rhel-login-banner-required-line-test'];
   assert.equal(standaloneTest.capability,'independent.textfilecontent54');
   assert.equal(standaloneTest.object.select.full_path.equals,'/etc/issue');
+  assert.equal(standaloneTest.object.object_title,'Read required login-banner text in /etc/issue',
+    'inline Object keeps its meaningful source title without inventing a shared Object ID');
   assert.equal(standaloneTest.states[0].text.equals,'Required banner text. (Revised+)');
   assert(standaloneTest.object.select.pattern.matches_regex.startsWith('^Required banner text'));
   assert.equal(standaloneTest.require,'at_least_one_exists_and_all_match');
