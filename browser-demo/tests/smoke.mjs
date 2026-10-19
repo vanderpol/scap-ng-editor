@@ -111,6 +111,7 @@ try {
     ['/etc/issue.net','/etc/issue.net','/etc/issue.net']);
   assert.equal(permit.require,'at_least_one_exists_and_all_match');
   await page.locator('[data-view="guided"]').click();
+  await page.locator('[data-step="0"]').click();
   assert((await page.locator('#content').innerText()).includes('Checks derived from your goal'),
     'complex draft must render back in Guided after round-trip');
   await page.locator('[data-step="4"]').click();
