@@ -1228,6 +1228,9 @@
     };
   }
   const genericSupportedField=(capability,field)=>{
+    // Registry "value" is multi-datatype (string/integer/binary/version).
+    // Choosing one implicitly would change authored semantics.
+    if(capability==="windows.registry"&&field==="value")return null;
     const map=guidedMaps.get(capability);
     if(!map||!Object.values(map.native.state_field_map).includes(field))return null;
     const types=map.native.field_datatypes[field]||[];
@@ -1388,13 +1391,39 @@
   }
   function genericTreeReady(a){
     const entries=Object.entries(a.tests||{});
-    if(!entries.every(([,t])=>
-         guidedMaps.has(t.capability)&&!!guidedLocator(t)&&Array.isArray(t.states)&&
-         t.states.length>=1&&
-         t.states.every(state=>Object.keys(state).length===1&&
-           Object.keys(state).every(key=>genericSupportedField(t.capability,key)))&&
-         (t.states.length<2||["all","any","one","odd"].includes(t.states_match))
-       ))return false;
+    if(!entries.every(([,t])=>{
+      const map=guidedMaps.get(t.capability),select=t.object?.select;
+      if(!map||!select||t.object.capability!==t.capability||!Array.isArray(t.states)||
+         !t.states.length||!levels.includes(t.require))return false;
+      if(t.capability==="windows.registry"){
+        if(Object.keys(select).sort().join(",")!=="hive,key,name"||
+           !map.native.selector_value_enums?.hive?.includes(select.hive?.equals)||
+           ![select.key?.equals,select.name?.equals].every(v=>typeof v==="string"&&v.length>0))return false;
+      }else{
+        const wanted=t.capability==="independent.textfilecontent54"?
+          "full_path,instance,pattern":"full_path";
+        if(Object.keys(select).sort().join(",")!==wanted||
+           typeof select.full_path?.equals!=="string"||
+           !select.full_path.equals.startsWith("/"))return false;
+        if(t.capability==="independent.textfilecontent54"&&
+           (typeof select.pattern?.matches_regex!=="string"||
+            select.instance?.greater_than_or_equal!==1||
+            t.states.length!==1||typeof t.states[0]?.text?.equals!=="string"))return false;
+      }
+      if(t.states.length>1&&!["all","any","one","odd"].includes(t.states_match))return false;
+      return t.states.every(state=>{
+        if(!state||typeof state!=="object"||Object.keys(state).length!==1)return false;
+        const name=Object.keys(state)[0],predicate=state[name],type=genericSupportedField(t.capability,name);
+        if(!type||!predicate||!levels.includes(predicate.require)||
+           !Object.hasOwn(predicate,"equals")||Object.keys(predicate).some(k=>!["equals","require"].includes(k)))return false;
+        const v=predicate.equals;
+        if(type==="integer"&&(!Number.isSafeInteger(v)))return false;
+        if(type==="boolean"&&typeof v!=="boolean")return false;
+        if(type==="string"&&typeof v!=="string")return false;
+        const vals=guidedValueEnums(t.capability,name);
+        return !vals||vals.includes(v);
+      });
+    }))return false;
     try{
       const leaves=guidedExpressionLeaves(a.evaluate);
       return leaves.length===entries.length&&leaves.every(id=>!!a.tests[id])&&
