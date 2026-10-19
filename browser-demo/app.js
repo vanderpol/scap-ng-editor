@@ -663,6 +663,32 @@
   }
   // The most common native record case (e.g., Get-Tpm) can be edited as a
   // compact field matrix while the original State/record nesting stays intact.
+  function alternativeValuesEditor(id,t){
+    const states=t.states;
+    if(!Array.isArray(states)||states.length<2||states.length>24||
+      !["all","any"].includes(t.states_match))return "";
+    const rows=[];
+    let commonField=null,commonComparison=null;
+    for(let i=0;i<states.length;i++){
+      const state=states[i];
+      if(!state||typeof state!=="object"||Array.isArray(state)||Object.keys(state).length!==1)return "";
+      const [fieldName,predicate]=Object.entries(state)[0];
+      if(!predicate||typeof predicate!=="object"||Array.isArray(predicate)||predicate.require)return "";
+      const operators=["equals","case_insensitive_equals","matches_regex","greater_than","less_than","greater_than_or_equal","less_than_or_equal"];
+      const used=operators.filter(key=>Object.hasOwn(predicate,key));
+      if(used.length!==1||Object.keys(predicate).length!==1||typeof predicate[used[0]]==="object")return "";
+      if(commonField===null){commonField=fieldName;commonComparison=used[0]}
+      else if(fieldName!==commonField||used[0]!==commonComparison)return "";
+      const v=predicate[used[0]];
+      rows.push({value:v,path:["assessment","tests",id,"states",i,fieldName,used[0]]});
+    }
+    const title=t.states_match==="any"?"Accept any of these values":"All these conditions must match";
+    const values=rows.map((r,i)=>'<label class="alternative-row"><span>'+(i+1)+'.</span>'+
+      '<input data-field="'+encodeURIComponent(JSON.stringify(r.path))+'" value="'+esc(String(r.value))+'" aria-label="Alternative '+(i+1)+'" type="text"></label>').join("");
+    return '<div class="inline-predicate alternatives-editor"><div class="predicate-heading">'+esc(title)+'</div>'+
+      '<p class="help">Field: <code>'+esc(commonField)+'</code> · '+esc(prettyName(commonComparison))+'</p>'+
+      '<div class="alternative-values">'+values+'</div></div>';
+  }
   function recordFieldEditor(id,t){
     if(!Array.isArray(t.states)||t.states.length!==1)return "";
     const state=t.states[0];
@@ -770,7 +796,7 @@
       '<h4>What this check means</h4>'+
       '<p class="check-sentence"><strong>Look at</strong> '+esc(from.text)+'. <small>'+esc(from.detail)+'</small></p>'+
       shellCommandDetails(a,id,t)+
-      (shape?oneFieldEditor(id,t):recordFieldEditor(id,t)||
+      (shape?oneFieldEditor(id,t):recordFieldEditor(id,t)||alternativeValuesEditor(id,t)||
         '<div class="condition-readonly"><strong>Conditions (States)</strong><p>'+esc(summarizeTest(t))+'</p><p class="help">Open full details to edit nested conditions.</p></div>')+
       '<div class="quick-results"><label>How many results must be found and match? (collected_items_require)</label>'+
       requirementSelect(["assessment","tests",id,"collected_items_require"],t.collected_items_require,"Results that must be found and match")+
