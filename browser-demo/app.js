@@ -518,7 +518,17 @@
     const ref=typeof t.object==="string"?t.object:null;
     const o=ref?a.shared_objects?.[ref]:t.object;
     const capability=t.capability||o?.capability||"unspecified capability";
-    if(!o||typeof o!=="object")return {text:"Referenced data source "+(ref||"not loaded"),detail:"Unresolved Object reference"};
+    if(!o||typeof o!=="object"){
+      if(ref)return {text:"Referenced data source "+ref,detail:"Shared Object definition missing"};
+      const objectless={
+        "windows.auditeventpolicysubcategories":"Windows audit-policy settings",
+        "windows.auditeventpolicy":"Windows audit-policy configuration",
+        "windows.systemmetric":"Windows system settings",
+        "independent.environmentvariable58":"environment variables"
+      };
+      return {text:objectless[capability]||"values collected by "+capability,
+        detail:"Collected directly by the "+capability+" capability; no separate Object was authored"};
+    }
     const humanCaps={
       "linux.partition":"mounted filesystem entries",
       "unix.file":"filesystem entries",
@@ -528,6 +538,24 @@
       "independent.shellcommand":"command output"
     };
     const source=humanCaps[capability]||capability+" results";
+    if(capability==="windows.cmdlet"&&o.collect?.verb&&o.collect?.noun){
+      const command=String(o.collect.verb)+"-"+String(o.collect.noun);
+      const mod=o.collect.module_name?" ("+o.collect.module_name+")":"";
+      return {text:"PowerShell "+command+mod,detail:"Exact cmdlet collection defined in collect; see details for parameters and selected properties"};
+    }
+    if(capability==="unix.sysctl"&&o.select?.name?.equals)
+      return {text:"kernel setting "+String(o.select.name.equals),detail:"Read via unix.sysctl"};
+    if(capability==="unix.interface"&&o.select?.name)
+      return {text:o.select.name.matches_regex===".*"?"network interfaces":"selected network interfaces",detail:"Read via unix.interface"};
+    if(capability==="independent.textfilecontent54"){
+      const select=o.select||{};
+      const path=select.full_path?.equals||
+        (select.directory?.equals&&select.name?.equals?String(select.directory.equals).replace(/\/$/,"")+"/"+select.name.equals:null);
+      const sample=select.pattern?.matches_regex;
+      return {text:path?"file "+path+(sample?" using an authored text pattern":""):"selected text-file content",
+        detail:"Text-file collection (textfilecontent54); "+(sample?"pattern in collection details":"see exact selector")};
+    }
+
     if(o.select&&typeof o.select==="object"){
       const selectors=Object.entries(o.select);
       const where=selectors.slice(0,3).map(([name,pred])=>shortClause(pred,name)).filter(Boolean);
@@ -741,11 +769,24 @@
       '</div></details>'+objectTrace(a,t)+variableTrace(a,t)+
       '</section>';
   }
+  function policyContext(){
+    const r=active(),rule=docs.get("rule:"+r?.id)?.tree.rule;
+    if(!rule)return "";
+    const stigId=(rule.identifiers||[]).find(x=>x.scheme==="stig")?.value;
+    const remediation=rule.remediation?.guidance;
+    return '<section class="card policy-context"><div class="inspector-eyebrow">THE POLICY REQUIREMENT</div>'+
+      '<h3>'+esc(rule.title||r.title)+'</h3>'+
+      '<p class="policy-ids">'+esc([r.id,stigId,rule.severity?rule.severity+" severity":""].filter(Boolean).join(" · "))+'</p>'+
+      '<details class="policy-details"><summary>Why this matters and how to fix it</summary>'+
+      (rule.discussion?'<p>'+esc(rule.discussion)+'</p>':"")+
+      (remediation?'<h4>Remediation</h4><p>'+esc(remediation)+'</p>':"")+
+      '</details></section>';
+  }
   function overview(){
     const a=doc().tree.assessment,refs={};countTestReferences(a.evaluate,refs);
     if(!selectedTest||!a.tests?.[selectedTest])selectedTest=Object.keys(refs).find(k=>a.tests?.[k])||Object.keys(a.tests||{})[0]||null;
     const unreferenced=Object.keys(a.tests||{}).filter(k=>!refs[k]);
-    return '<section class="card"><h3>Assessment logic · '+esc(a.id)+'</h3><p>'+esc(a.assessment_title)+'</p><p class="help">Pinned source version '+esc(a.specification?.version||"unspecified")+' · Explanation of authored logic only · NOT SCANNER-VERIFIED</p></section>'+
+    return policyContext()+'<section class="card"><h3>How compliance is checked</h3><p class="help">Assessment '+esc(a.id)+' · Draft '+esc(a.specification?.version||"unspecified")+' · No scanner results</p></section>'+
       '<div class="graph-layout"><section class="card logic-pane"><h3>1 · How the checks work together (evaluate)</h3><p class="help">Expand a branch. Select any Test to inspect it alongside the tree.</p>'+
       logic(a.evaluate,a,refs)+
       (unreferenced.length?'<details class="dependency-group"><summary>Unreferenced Test definitions ('+unreferenced.length+')</summary><div class="structure-children">'+unreferenced.map(id=>'<button class="logic-leaf" data-select-test="'+esc(id)+'">'+esc(a.tests[id].test_title||id)+'</button>').join("")+'</div></details>':"")+
