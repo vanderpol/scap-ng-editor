@@ -234,6 +234,7 @@
   }
   const active=()=>ruleRows.find(r=>r.id===chosen);
   const doc=()=>active()?.linked;
+  const manualDoc=()=>active()?.manualId?docs.get("assessment:"+active().manualId):null;
   function display(txt,bad=false){message=txt;$("status").textContent=txt;$("status").className=bad?"warning":""}
   function flag(r){
     if(candidate.has(r.id))return '<span class="tag orange">AI candidate? Human proposal only</span>';
@@ -305,11 +306,11 @@
     library();render();
   }
   function tabs(){
-    $("tabs").querySelectorAll("[data-view]").forEach(e=>{e.classList.toggle("selected",e.dataset.view===view);e.disabled=!doc()});
-    $("export").disabled=!doc();$("original").disabled=!doc();
+    $("tabs").querySelectorAll("[data-view]").forEach(e=>{e.classList.toggle("selected",e.dataset.view===view);e.disabled=!(doc()||manualDoc()&&e.dataset.view==="source")});
+    $("export").disabled=!(doc()||manualDoc());$("original").disabled=!(doc()||manualDoc());
   }
-  function setView(name){if(!doc())return;
-    const raw=$("rawyaml");if(raw&&raw.value!==doc().source){display("Apply your YAML source changes before switching views.",true);return}
+  function setView(name){if(!doc()&&!manualDoc())return;
+    const raw=$("rawyaml");if(raw&&raw.value!==(doc()||manualDoc()).source){display("Apply your YAML source changes before switching views.",true);return}
     view=name;render();
   }
   function field(path,name,value,opts){
@@ -771,6 +772,20 @@
   }
   function rawEditor(){return '<div class="card"><h3>YAML source</h3><p class="help">Original source is preserved until you edit. Structured edits reserialize YAML and may change formatting; export and review diffs carefully.</p><textarea id="rawyaml" class="editor" spellcheck="false">'+esc(doc().source)+'</textarea><div class="actions"><button id="applyYAML" class="button primary">Apply YAML to other views</button><span id="rawStatus" class="help">Source and graphical views synchronized</span></div></div>'}
   function sourceView(){return rawEditor()}
+  function showManualAssessment(r,d){
+    const a=d.tree.assessment;
+    const choices=(a.response?.choices||[]).map(x=>'<span class="tag">'+esc(x.label||x.value||"Unknown")+'</span>').join("");
+    const procedure=typeof a.procedure==="string"?a.procedure:"No procedure text in the selected source.";
+    return '<section class="card manual-assessment"><h3>Manual assessment</h3>'+
+      '<p class="help">No automated Assessment choice is present in this source Rule. This does not prove automation is impossible.</p>'+
+      '<h4>How to check compliance</h4>'+
+      '<textarea id="manual-procedure" class="manual-procedure" aria-label="Manual check procedure">'+esc(procedure)+'</textarea>'+
+      '<p class="help">Editing changes the local YAML draft; review the source before exporting.</p>'+
+      '<details class="inspector-section"><summary>Allowed responses and evidence options</summary><div class="structure-children">'+
+      '<p>'+choices+'</p><p>Comments: '+(a.response?.allow_comment?"Allowed":"Not enabled")+
+      ' · Evidence: '+(a.response?.allow_evidence?"Allowed":"Not enabled")+'</p></div></details>'+
+      '</section>';
+  }
   function render(){
     const r=active();tabs();
     if(!r){$("crumb").textContent="LOCAL BROWSER WORKSPACE";$("title").textContent="SCAP-NG Assessment Studio";$("content").innerHTML='<section class="card"><h3>Select a STIG, then a Rule</h3><p>Expand a STIG on the left to view its Rules. No scanner is connected.</p></section>';return}
@@ -779,6 +794,26 @@
     $("state").textContent="No scanner connected";
     const d=doc();
     if(!d){
+      const manual=manualDoc();
+      if(manual){
+        $("notice").textContent="Manual Assessment from pinned source · scanner not connected.";
+        $("content").innerHTML=view==="source"?'<div class="card"><h3>Manual YAML source</h3><textarea id="rawyaml" class="editor" spellcheck="false">'+esc(manual.source)+'</textarea><div class="actions"><button id="applyYAML" class="button primary">Apply YAML</button><span id="rawStatus" class="help">Draft source</span></div></div>':showManualAssessment(r,manual);
+        const editor=$("manual-procedure");
+        if(editor)editor.onchange=()=>{
+          const previous=manual.tree.assessment.procedure;
+          manual.tree.assessment.procedure=editor.value;
+          try{manual.source=jsyaml.dump(manual.tree,{lineWidth:105,noRefs:true});manual.changed=true;saveState();display("Manual procedure updated in draft — review YAML before export.");render()}
+          catch(err){manual.tree.assessment.procedure=previous;display(err.message,true)}
+        };
+        const raw=$("rawyaml");
+        if(raw){raw.oninput=()=>{$("rawStatus").textContent="Unapplied changes";dirtySource=true};
+          $("applyYAML").onclick=()=>{
+            try{const p=parse(raw.value);if(p.kind!=="assessment"||p.id!==manual.id)throw Error("Manual Assessment identity must not change");
+              manual.tree=p.tree;manual.source=raw.value;manual.changed=true;dirtySource=false;saveState();render();display("Manual Assessment updated from source.")}
+            catch(err){display("Source error: "+err.message,true)}
+          }}
+        return;
+      }
       const linked=Boolean(r.aid);
       $("content").innerHTML='<section class="card"><h3>'+esc(linked?"Automated Assessment source not loaded":"No automated Assessment selected")+'</h3>'+
         '<p>'+esc(linked?"The Rule references "+r.aid+", but its source is not in the current library. This is not evidence that the Rule is manual-only.":"This loaded Rule has no automated Assessment choice.")+'</p>'+
@@ -848,7 +883,7 @@
     e.target.value="";indexRules();library();saveState();if(!chosen&&ruleRows.length)open(ruleRows[0].id);else render();
     if(imported)display("Imported "+imported+" source document(s). This is a local browser draft.");
   };
-  $("export").onclick=()=>{if(!doc())return;let raw=$("rawyaml");if(raw&&raw.value!==doc().source){display("Apply source edits before exporting",true);return}download(doc().name,doc().source,"text/yaml");display("YAML downloaded to your device")};
+  $("export").onclick=()=>{if(!doc()&&!manualDoc())return;let raw=$("rawyaml");if(raw&&raw.value!==doc().source){display("Apply source edits before exporting",true);return}download(doc().name,doc().source,"text/yaml");display("YAML downloaded to your device")};
   $("original").onclick=()=>{const d=doc();if(d&&confirm("Restore this Assessment to its original loaded source?")){const p=parse(d.original);d.source=d.original;d.tree=p.tree;d.changed=false;saveState();indexRules();library();render();display("Original restored.")}};
   async function init(){
     if(!window.jsyaml){display("YAML parser asset did not load — app cannot parse files.",true);return}
