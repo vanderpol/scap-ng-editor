@@ -1315,6 +1315,213 @@
     }catch(err){d.tree=before;render();display(err.message,true)}
   }
 
+
+  function genericWizard(){
+    const a=doc().tree.assessment,entries=Object.entries(a.tests||{});
+    if(!genericTreeReady(a))return '<section class="card"><h3>Source structure needs review</h3>'+
+      '<p>This Assessment contains a more advanced or inconsistent expression than the bounded Guided authoring builder can safely edit. Source is preserved.</p>'+
+      '<button id="gotoSource" class="button">Inspect YAML</button></section>';
+    const caps=[["independent.textfilecontent54","Find text in a Linux file"],
+                ["unix.file","Inspect Linux file owner/permissions"]];
+    const capabilities=caps.filter(([key])=>guidedMaps.has(key));
+    const capList=capabilities.map(([key,name])=>'<option value="'+esc(key)+'">'+esc(name)+' — '+esc(key)+'</option>').join("");
+    const op=a.evaluate?.any?"any":"all";
+    const testRows=entries.map(([id,t],i)=>{
+      const path=t.object.select.full_path.equals,isText=t.capability==="independent.textfilecontent54";
+      const details=isText?'<label>Complete required line (textfilecontent54)</label>'+
+        '<textarea rows="2" data-generic-line="'+esc(id)+'">'+esc(t.states[0]?.text?.equals??"")+'</textarea>'+
+        '<p class="help">One independent Test checks one required line. Add a separate Test for another required line.</p>':
+        '<h4>What must be true of the same collected file?</h4>'+
+        t.states.map((entry,index)=>{
+          const name=Object.keys(entry)[0],p=entry[name],type=genericSupportedField(t.capability,name);
+          return '<div class="generic-state-row"><strong>'+esc(name.replaceAll("_"," "))+'</strong>'+
+            '<div>'+(
+              type==="boolean"?
+                '<select aria-label="Expected '+esc(name)+'" data-generic-state="'+esc(id)+'" data-index="'+index+'">'+
+                ["true","false"].map(v=>'<option value="'+v+'" '+(String(p.equals)===v?"selected":"")+'>'+v+'</option>').join("")+'</select>':
+                '<input aria-label="Expected '+esc(name)+'" type="'+(type==="integer"?"number":"text")+'" data-generic-state="'+esc(id)+'" data-index="'+index+'" value="'+esc(p.equals)+'" '+(type==="integer"?'step="1"':"")+'>'
+            )+'</div>'+
+            '<button class="button" data-generic-remove-state="'+esc(id)+'" data-index="'+index+'" '+(t.states.length<=1?"disabled":"")+' title="Remove this expected field">Remove</button></div>';
+        }).join("")+
+        (t.states.length>1?field(["assessment","tests",id,"states_match"],
+            "How conditions on this same file combine",t.states_match,["all","any","one","odd"]):"")+
+        '<form class="generic-add-state" data-generic-add-state="'+esc(id)+'">'+
+        '<label>Add another condition to the SAME file</label>'+
+        '<div class="generic-cond-add"><select data-generic-field-for="'+esc(id)+'" aria-label="Expected field to add">'+
+        genericFieldOptions()+'</select><span data-generic-value-host="'+esc(id)+'"></span>'+
+        '<button type="submit" class="button">+ Add condition</button></div></form>';
+      return '<section class="card generic-check"><div class="generic-check-top">'+
+        '<h3>Check '+(i+1)+' · '+esc(t.test_title)+'</h3>'+
+        '<button type="button" class="button" data-generic-remove-test="'+esc(id)+'">Remove check</button></div>'+
+        '<p class="help">Capability: '+esc(t.capability)+'</p>'+
+        '<div class="generic-check-fields">'+
+        '<div><label>Check description</label><input data-field="'+encodeURIComponent(JSON.stringify(["assessment","tests",id,"test_title"]))+'" value="'+esc(t.test_title)+'"></div>'+
+        '<div><label>Test ID (editable)</label><input data-generic-rename="'+esc(id)+'" value="'+esc(id)+'" spellcheck="false"></div>'+
+        '<div><label>Absolute file path</label><input data-generic-path="'+esc(id)+'" value="'+esc(path)+'" spellcheck="false"></div>'+
+        '<div><label>Data source description</label><input data-field="'+encodeURIComponent(JSON.stringify(["assessment","tests",id,"object","object_title"]))+'" value="'+esc(t.object.object_title||"")+'"></div></div>'+
+        details+
+        '<details><summary>More collection and matching details (advanced)</summary>'+
+        '<p>Collected Items requirement: '+esc(t.require)+'</p>'+
+        (isText?'<p>Text collection is pinned to exact complete-line search with explicit options and escaped punctuation.</p>':"")+
+        '<p class="help">Detailed edits remain available through Source; no hidden semantic changes are applied.</p></details></section>';
+    }).join("");
+    const addDisabled=capabilities.length!==2;
+    return '<section class="card"><h3>Guided Assessment — started from your goal</h3>'+
+      field(["assessment","assessment_title"],"Security requirement",a.assessment_title)+
+      field(["assessment","id"],"Assessment ID",a.id)+
+      '<p class="help">Not tied to any STIG. The editor will not invent collection results or a scanner verdict.</p>'+
+      '<p><strong>'+entries.length+' independent check'+(entries.length===1?"":"s")+'</strong> · '+
+      new Set(entries.map(([,t])=>t.capability)).size+' capabilities</p>'+
+      (entries.length===0?'<p class="warning">Incomplete draft: no Tests yet. Add your first check below.</p>':"")+
+      '</section>'+
+      (entries.length>1?'<section class="card"><h3>How do the independent checks combine?</h3>'+
+        '<select id="generic-logic" aria-label="Combine independent Tests">'+
+        '<option value="all" '+(op==="all"?"selected":"")+'>ALL checks must succeed (AND)</option>'+
+        '<option value="any" '+(op==="any"?"selected":"")+'>ANY check may succeed (OR)</option></select>'+
+        '<p class="help">This changes the Assessment expression, not which expected fields belong to each Test.</p></section>':"")+
+      testRows+
+      '<section class="card"><h3>+ Add an independent check</h3>'+
+      (addDisabled?'<p class="warning">'+esc(guidedMapError)+'</p>':'<p class="help">Select a source capability, then describe the expected field or required text.</p>')+
+      '<form id="generic-add-test" class="standalone-create">'+
+      '<label for="generic-check-title">What does this check verify?</label>'+
+      '<input id="generic-check-title" required placeholder="Example: The audit log must be owned by root">'+
+      '<label for="generic-check-id">Suggested Test ID (editable)</label>'+
+      '<input id="generic-check-id" required spellcheck="false" placeholder="audit-log-owned-by-root-test">'+
+      '<label for="generic-capability">How should the data be collected?</label>'+
+      '<select id="generic-capability" '+(addDisabled?"disabled":"")+'>'+capList+'</select>'+
+      '<label for="generic-path">Absolute file to inspect</label>'+
+      '<input id="generic-path" required spellcheck="false" placeholder="/var/log/secure">'+
+      '<div id="generic-line-group" class="generic-dynamic"><label for="generic-line">Exact complete line required in the file</label>'+
+      '<textarea id="generic-line" rows="2" placeholder="Required notice text"></textarea></div>'+
+      '<div id="generic-field-group" class="generic-dynamic" hidden>'+
+      '<label for="generic-field">Which file property must match?</label>'+
+      '<select id="generic-field">'+genericFieldOptions()+'</select>'+
+      '<label for="generic-value">Required field value</label><div id="generic-new-value-host"></div></div>'+
+      '<button type="submit" class="button primary" '+(addDisabled?"disabled":"")+'>+ Add check</button>'+
+      '<p id="generic-error" role="alert" class="warning"></p></form></section>'+
+      (entries.length?'<section class="card"><h3>Review the composed Assessment</h3>'+
+        '<p>Checks: '+entries.map(([,t])=>esc(t.test_title)).join("; ")+'</p>'+
+        '<p>Assessment requires: '+(entries.length===1?"the single check":op==="any"?"any one of the checks":"every check")+'</p>'+
+        '<button id="gotoSource" class="button primary">Review complete YAML</button>'+
+        '<p class="warning">Authoring draft only. No complete schema/capability semantic validation or scanner execution.</p></section>':"");
+  }
+  function bindGenericEditors(){
+    const d=doc();
+    if(!standaloneId||!d?.guidedGeneric||view!=="guided")return;
+    const cap=$("generic-capability"),newField=$("generic-field");
+    const showCapability=()=>{
+      if(!cap)return;
+      const isText=cap.value==="independent.textfilecontent54";
+      $("generic-line-group").hidden=!isText;
+      $("generic-field-group").hidden=isText;
+      $("generic-line").required=isText;
+      if(!isText)newFileValue();
+    };
+    function newFileValue(){
+      const field=newField?.value,type=genericSupportedField("unix.file",field);
+      if(!field||!type)return;
+      $("generic-new-value-host").innerHTML=genericValue(type,type==="boolean"?false:type==="integer"?0:"");
+    }
+    if(cap){cap.onchange=showCapability;newField.onchange=newFileValue;showCapability()}
+    const checkTitle=$("generic-check-title"),checkId=$("generic-check-id");
+    let manualId=false;
+    if(checkTitle){checkId.oninput=()=>{manualId=true};checkTitle.oninput=()=>{
+      if(!manualId)checkId.value=suggestId(checkTitle.value,"-test")
+    }}
+    const add=$("generic-add-test");
+    if(add)add.onsubmit=e=>{
+      e.preventDefault();
+      const capability=cap.value;
+      genericChange(a=>genericNewTest(a,{
+        title:checkTitle.value,id:checkId.value.trim(),capability,
+        path:$("generic-path").value.trim(),line:$("generic-line").value,
+        field:newField.value,value:$("generic-value")?.value
+      }),"Added independent check");
+    };
+    $("content").querySelectorAll("[data-generic-rename]").forEach(e=>e.onchange=()=>{
+      const old=e.dataset.genericRename,newId=e.value.trim();
+      genericChange(a=>renameTestAndReferences({assessment:a},old,newId),"Updated Test ID and expression references");
+    });
+    $("content").querySelectorAll("[data-generic-path]").forEach(e=>e.onchange=()=>{
+      const id=e.dataset.genericPath,path=e.value.trim();
+      genericChange(a=>{
+        if(!path.startsWith("/")||path.length<2||/[\r\n]/.test(path))throw Error("Enter an absolute Linux path.");
+        const t=a.tests[id],old=t.object.select.full_path.equals;
+        t.object.select.full_path.equals=path;
+        if(t.object.object_title?.endsWith(old))
+          t.object.object_title=t.object.object_title.slice(0,-old.length)+path;
+      },"Changed one Test collection path");
+    });
+    $("content").querySelectorAll("[data-generic-line]").forEach(e=>e.onchange=()=>{
+      const id=e.dataset.genericLine,line=e.value;
+      genericChange(a=>{
+        if(!line.trim()||/[\r\n]/.test(line))throw Error("Required text must be one nonempty complete line.");
+        const t=a.tests[id];
+        if(t.capability!=="independent.textfilecontent54"||!t.object.select.pattern||!t.states[0]?.text)
+          throw Error("Not a supported text-line Test.");
+        t.object.select.pattern.matches_regex=linePattern(line);
+        t.states[0].text.equals=line;
+      },"Updated text value and escaped collection pattern");
+    });
+    $("content").querySelectorAll("[data-generic-state]").forEach(e=>e.onchange=()=>{
+      const id=e.dataset.genericState,index=Number(e.dataset.index),value=e.value;
+      genericChange(a=>{
+        const t=a.tests[id],state=t.states[index],field=Object.keys(state)[0];
+        state[field].equals=genericTypedValue(field,value);
+      },"Changed expected file property");
+    });
+    $("content").querySelectorAll("[data-generic-remove-state]").forEach(e=>e.onclick=()=>{
+      const id=e.dataset.genericRemoveState,index=Number(e.dataset.index);
+      if(!confirm("Remove this expected field from the Test?"))return;
+      genericChange(a=>{
+        const t=a.tests[id];if(t.capability!=="unix.file"||t.states.length<2)throw Error("At least one State is required.");
+        t.states.splice(index,1);if(t.states.length<2)delete t.states_match;
+      },"Removed one State and preserved other fields");
+    });
+    $("content").querySelectorAll("[data-generic-add-state]").forEach(form=>{
+      const id=form.dataset.genericAddState,choice=form.querySelector("[data-generic-field-for]"),
+        host=form.querySelector("[data-generic-value-host]");
+      const refresh=()=>{
+        const type=genericSupportedField("unix.file",choice.value);
+        host.innerHTML=genericValue(type,type==="boolean"?false:type==="integer"?0:"");
+      };
+      choice.onchange=refresh;refresh();
+      form.onsubmit=e=>{
+        e.preventDefault();
+        const field=choice.value,value=form.querySelector("#generic-value")?.value;
+        genericChange(a=>{
+          const t=a.tests[id];
+          if(t.capability!=="unix.file")throw Error("Only unix.file accepts these State fields.");
+          if(t.states.some(s=>Object.hasOwn(s,field)))throw Error("Field already has a condition on this file.");
+          t.states.push({[field]:{equals:genericTypedValue(field,value),require:"at_least_one_exists_and_all_match"}});
+          if(t.states.length===2)t.states_match="all";
+        },"Added same-file expected field");
+      };
+    });
+    $("content").querySelectorAll("[data-generic-remove-test]").forEach(e=>e.onclick=()=>{
+      const id=e.dataset.genericRemoveTest;
+      if(!confirm("Delete this Test and unlink it from the Assessment expression?"))return;
+      genericChange(a=>{
+        const old=a.evaluate,leaves=old?.all||old?.any||(old?.test?[old]:[]);
+        if(!leaves.some(x=>x.test===id))throw Error("Test is not referenced; review source.");
+        const next=leaves.filter(x=>x.test!==id);
+        delete a.tests[id];
+        if(!next.length)delete a.evaluate;
+        else if(next.length===1)a.evaluate=next[0];
+        else a.evaluate={[old.any?"any":"all"]:next};
+      },"Removed Test and repaired Assessment-level references");
+    });
+    const combo=$("generic-logic");
+    if(combo)combo.onchange=()=>{
+      if(!confirm("Change Assessment check logic to "+combo.value.toUpperCase()+"? The overall result can change.")){render();return}
+      genericChange(a=>{
+        const old=a.evaluate,leaves=old?.all||old?.any;
+        if(!Array.isArray(leaves)||leaves.length<2)throw Error("Expected a flat multi-Test expression.");
+        a.evaluate={[combo.value]:leaves};
+      },"Changed Assessment AND/OR logic");
+    };
+  }
+
   function renderStandaloneCreation(){
     if(newCreateMode==="blank"){renderBlankCreation();return}
     $("crumb").textContent="MY ASSESSMENTS / NEW";$("title").textContent="New Assessment";
