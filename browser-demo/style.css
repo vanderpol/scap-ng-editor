@@ -143,3 +143,9 @@
 .alternative-row{display:flex;align-items:center;gap:5px;font-size:11px}
 .alternative-row span{color:#607a93}
 .alternative-row input{width:130px;max-width:100%;padding:7px;border:1px solid #bcd1e4;background:#fff;border-radius:6px;font:12px ui-monospace,Consolas,monospace}
+
+/* Rule-by-rule review must not require returning to the long STIG sidebar. */
+.rule-navigation{display:flex;justify-content:space-between;align-items:center;gap:9px;margin:0 0 12px;padding:8px 10px;background:#fff;border:1px solid #dce6f1;border-radius:7px}
+.rule-navigation .button{font-size:12px;padding:6px 9px;min-width:0}
+.rule-navigation span{font-size:11px;color:#627a90;white-space:nowrap}
+@media(max-width:580px){.rule-navigation{flex-wrap:wrap}.rule-navigation span{order:-1;flex:0 0 100%;text-align:center}}
