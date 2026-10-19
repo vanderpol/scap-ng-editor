@@ -26,9 +26,10 @@ try {
   assert((await page.locator('#test-inspector').innerText()).includes('Look at'), 'data collection should appear in the same check as expected conditions');
   assert((await page.locator('#test-inspector').innerText()).includes('windows-userright-object'), 'shared Object should be reachable in Test details');
 
-  assert((await page.locator('#test-inspector .combined-check').innerText()).includes('Require'), 'matching conditions must be displayed in the same card as collection');
-  assert((await page.locator('#test-inspector .combined-check').innerText()).includes('Which collected results must exist and match?'), 'result-count dropdown should be visible by the condition');
+  assert((await page.locator('#test-inspector .combined-check').innerText()).includes('Check (State)'), 'matching condition must be editable alongside collection');
+  assert((await page.locator('#test-inspector .combined-check').innerText()).includes('Matching collected results'), 'result-count control should have a compact clear label');
   assert.equal(await page.locator('#test-inspector .quick-results select[data-field]').count(), 1, 'direct dropdown should change Test result cardinality');
+  assert((await page.locator('#test-inspector .combined-check').innerText()).includes('Matching values per result'), 'field-level matching count should have a compact explicit label');
   await page.locator('#test-inspector .result-explanation summary').click();
   assert((await page.locator('#test-inspector .combined-check').innerText()).includes('Must be found:'), 'expanded help must explain result existence');
   assert((await page.locator('#test-inspector .combined-check').innerText()).includes('Must match:'), 'expanded help must explain match count independently');
