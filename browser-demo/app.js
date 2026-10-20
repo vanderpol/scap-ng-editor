@@ -368,7 +368,7 @@
     const v=String(value);
     if(Array.isArray(opts)&&opts===levels&&!levels.includes(v))
       return '<div class="property"><label>'+esc(name)+'</label><p class="help">Special authored requirement: <code>'+esc(v)+'</code>. Use Source for this unsupported quick-edit option.</p></div>';
-    const optionLabel=x=>levels.includes(x)?requirementDescription(x)+" ("+x+")":
+    const optionLabel=x=>levels.includes(x)?(name.includes("collected_items_require") && x==="at_least_one_exists_and_all_match" ? "At least one item exists; all items must pass" : name.includes("collected_items_require") && x==="may_be_absent_and_all_match" ? "Items may be absent; all items found must pass" : requirementDescription(x))+" ("+x+")":
       ["all","any","none","one"].includes(x)?({all:"All conditions must match",any:"At least one condition must match",none:"No conditions may match",one:"Exactly one condition must match"}[x])+" ("+x+")":x.replaceAll("_"," ");
     const choice=Array.isArray(opts)?'<select data-field="'+enc+'" aria-label="'+esc(name)+'">'+[...new Set([v,...opts])].map(x=>'<option value="'+esc(x)+'" '+(x===v?"selected":"")+'>'+esc(optionLabel(x))+'</option>').join("")+'</select>':'<input type="text" data-field="'+enc+'" value="'+esc(v)+'" aria-label="'+esc(name)+'">';
     return '<div class="property"><label>'+esc(name)+'</label>'+choice+'</div>';
