@@ -857,6 +857,10 @@
       shellCommandDetails(a,id,t)+
       (shape?oneFieldEditor(id,t):recordFieldEditor(id,t)||alternativeValuesEditor(id,t)||
         '<div class="condition-readonly"><strong>Conditions (States)</strong><p>'+esc(summarizeTest(t))+'</p><p class="help">Open full details to edit nested conditions.</p></div>')+
+      (t.collected_items_require==="at_least_one_exists_and_all_match" && Array.isArray(t.states) && t.states.length?
+        '<div class="condition-readonly"><strong>0.4-A all-items-must reading</strong><p>At least one matching entry must exist. <strong>Every collected entry must satisfy the State expression.</strong> '+
+        (t.states_match==="any"?'For each entry, <strong>at least one</strong> alternative State must match; Enterprise <em>or</em> EnterpriseS, not both.':t.states_match==="all"?'For each entry, all alternative States must match.':'Check the alternative-State combination below.')+
+        '</p><p class="help">Read-only authoring preview. The original source and its requirement token are retained on export; this does not assert scanner equivalence.</p></div>':"")+
       '<div class="quick-results"><label>How many results must be found and match? (collected_items_require)</label>'+
       requirementSelect(["assessment","tests",id,requireKey],t[requireKey],"Results that must be found and match")+
       '<details class="result-explanation"><summary>What does this mean?</summary>'+
