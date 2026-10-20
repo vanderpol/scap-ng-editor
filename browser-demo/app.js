@@ -848,6 +848,22 @@
     }
     return header+'<p class="warning">No directly displayable command string is present. Inspect the complete collection source below.</p></div>';
   }
+  function allItemsMustProposal(t){
+    if(!t||!Array.isArray(t.states)||!t.states.length)return "";
+    const pair=t.collected_items_require;
+    const items=pair==="at_least_one_exists_and_all_match"?"one_or_more":
+      pair==="may_be_absent_and_all_match"?"may_be_absent":null;
+    if(!items||!window.jsyaml?.dump)return "";
+    const copy=JSON.parse(JSON.stringify(t));
+    const states=copy.states;
+    delete copy.states;
+    delete copy.collected_items_require;
+    copy.require={items,all_items_must:states};
+    const example=window.jsyaml.dump(copy,{noRefs:true,lineWidth:100});
+    return '<details class="structure-node"><summary>See experimental 0.4-A all_items_must YAML for this Test</summary>'+
+      '<p class="help">Read-only and reversible authoring proposal. It is not current schema-valid YAML; export keeps the original tested 0.4-A source.</p>'+
+      '<pre class="code">'+esc(example)+'</pre></details>';
+  }
   function combinedReading(a,id,t){
     const from=humanCollection(a,t),shape=simpleMatchShape(t),requireKey=Object.hasOwn(t,"require")?"require":"collected_items_require",counts=resultCountExplanation(t[requireKey]);
     const mode=t.states_match==="any"?"At least one alternative must match":t.states_match==="all"?"All alternatives must match":t.states_match==="none"?"No alternative may match":t.states_match==="one"?"Exactly one alternative must match":"State combination shown in details";
@@ -855,6 +871,7 @@
       '<h4>What this check means</h4>'+
       '<p class="check-sentence"><strong>Look at</strong> '+esc(from.text)+'. <small>'+esc(from.detail)+'</small></p>'+
       shellCommandDetails(a,id,t)+
+      allItemsMustProposal(t)+
       (shape?oneFieldEditor(id,t):recordFieldEditor(id,t)||alternativeValuesEditor(id,t)||
         '<div class="condition-readonly"><strong>Conditions (States)</strong><p>'+esc(summarizeTest(t))+'</p><p class="help">Open full details to edit nested conditions.</p></div>')+
       (t.collected_items_require==="at_least_one_exists_and_all_match" && Array.isArray(t.states) && t.states.length?
